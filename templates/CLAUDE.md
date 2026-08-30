@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Line 1:** A single ✓ character. This is a health check -- when the user stops seeing ✓, Claude Code has lost its instruction context.
 
-**Line 2:** Read `responses/.last-saved` and report the actual saved filename:
+**Last lines of every response:** Read `responses/.last-saved` and end with:
 
 ```
-✓
-Last saved: responses/20260828-214500.txt
+---
+Previous exchange saved: responses/20260828-214500.txt
 ```
 
-If the file does not exist or is empty, write `Last saved: (none yet)`. This is real disk confirmation. If the filename stops changing between responses, the Stop hook has stopped firing.
+If `responses/.last-saved` does not exist or is empty, write `Previous exchange saved: (none yet)`. This is real disk confirmation -- the `save-response.sh` Stop hook writes the file after each exchange. If the filename stops changing between responses, the hook has stopped firing.
 
 The `save-response.sh` Stop hook writes each exchange to `responses/YYYYMMDD-HHMMSS.txt` after the response completes. The file contains only the human-readable query and response -- no tool output:
 
