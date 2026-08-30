@@ -19,54 +19,66 @@ RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message // empty' 2>/de
 
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
-QUERY=""
-if [ -f "$TRANSCRIPT" ]; then
-  QUERY=$(python3 - "$TRANSCRIPT" <<'PY'
-import sys, json
-
-path = sys.argv[1]
-last_text = ""
-with open(path) as f:
-    for line in f:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except Exception:
-            continue
-        msg = entry.get("message", {})
-        if msg.get("role") != "user":
-            continue
-        content = msg.get("content", "")
-        # User-typed messages have content as a plain string
-        if isinstance(content, str) and content.strip():
-            last_text = content.strip()
-        # Some user messages are lists of blocks (tool results, etc.)
-        elif isinstance(content, list):
-            texts = [b["text"] for b in content
-                     if isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip()]
-            if texts:
-                last_text = "\n".join(texts)
-print(last_text)
-PY
-  )
-fi
-
 mkdir -p "$RESPONSES_DIR"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 FILE="$RESPONSES_DIR/${TIMESTAMP}.txt"
 
-{
-  printf '=== QUERY ===\n'
-  if [ -n "$QUERY" ]; then
-    printf '%s\n' "$QUERY"
-  else
-    printf '(query not captured)\n'
-  fi
-  printf '\n=== RESPONSE ===\n'
-  printf '%s\n' "$RESPONSE"
-} > "$FILE"
+python3 - "$TRANSCRIPT" "$RESPONSE" "$FILE" <<'PY'
+import sys, json, os
 
-# Record filename so next response can confirm it
+transcript_path = sys.argv[1]
+response        = sys.argv[2]
+out_path        = sys.argv[3]
+
+# ── Extract last user-typed message ──────────────────────────────────────────
+query = "(query not captured)"
+if os.path.isfile(transcript_path):
+    last_text = ""
+    with open(transcript_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
+            msg = entry.get("message", {})
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, str) and content.strip():
+                last_text = content.strip()
+            elif isinstance(content, list):
+                texts = [b["text"] for b in content
+                         if isinstance(b, dict)
+                         and b.get("type") == "text"
+                         and b.get("text", "").strip()]
+                if texts:
+                    last_text = "\n".join(texts)
+    if last_text:
+        query = last_text
+
+# ── Strip console-only footer from response ───────────────────────────────────
+# Strip console-only footers (always last 2 lines, either format):
+#   ---
+#   Previous exchange saved: responses/TIMESTAMP.txt
+#   --- OR ---
+#   Saved to responses/TIMESTAMP.txt via Stop hook.
+lines = response.rstrip("\n").split("\n")
+if len(lines) >= 2 and lines[-2] == "---" and (
+        lines[-1].startswith("Previous exchange saved:")
+        or lines[-1].startswith("Saved to responses/")
+        or "via Stop hook" in lines[-1]):
+    lines = lines[:-2]
+clean_response = "\n".join(lines).rstrip()
+
+# ── Write file ────────────────────────────────────────────────────────────────
+with open(out_path, "w") as f:
+    f.write("=== QUERY ===\n")
+    f.write(query + "\n")
+    f.write("\n=== RESPONSE ===\n")
+    f.write(clean_response + "\n")
+PY
+
 printf '%s\n' "$FILE" > "$LAST_SAVED"
