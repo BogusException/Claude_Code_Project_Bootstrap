@@ -8,6 +8,8 @@ TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
 MARKETPLACE_HOOKS="$HOME/.claude/plugins/marketplaces/dotclaude/hooks"
 MARKETPLACE_RULES="$HOME/.claude/plugins/marketplaces/dotclaude/rules"
 TEST_MODE=false
+SETUP_LOCAL_REPO=false
+BARE_REPO=""
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -164,10 +166,17 @@ phase1_preflight() {
     log ""
     if [[ "$TEST_MODE" == "true" ]]; then
         confirm="y"
+        local_repo_ans="n"
     else
         read -r -p "Proceed with bootstrap? [y/N]: " confirm
+        [[ "${confirm,,}" == "y" ]] || { err "Aborted."; exit 1; }
+        echo ""
+        read -r -p "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " local_repo_ans
     fi
-    [[ "${confirm,,}" == "y" ]] || { err "Aborted."; exit 1; }
+    if [[ "${local_repo_ans,,}" != "n" ]]; then
+        SETUP_LOCAL_REPO=true
+        BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
+    fi
 }
 
 # ─── Phase 2: Git ─────────────────────────────────────────────────────────────
@@ -181,7 +190,24 @@ phase2_git() {
     else
         log "  .git exists — skipping init"
     fi
-    log "  No remote configured — add one later (see docs/adding-remotes.md)"
+
+    if [[ "$SETUP_LOCAL_REPO" == "true" ]]; then
+        mkdir -p "$HOME/Repositories"
+        if [[ ! -d "$BARE_REPO" ]]; then
+            git init --bare -q "$BARE_REPO"
+            log "  Created bare repo: $BARE_REPO"
+        else
+            log "  Bare repo exists — skipping init"
+        fi
+        if git -C "$PROJECT_DIR" remote get-url origin &>/dev/null 2>&1; then
+            git -C "$PROJECT_DIR" remote set-url origin "$BARE_REPO"
+        else
+            git -C "$PROJECT_DIR" remote add origin "$BARE_REPO"
+        fi
+        log "  Remote origin → $BARE_REPO"
+    else
+        log "  No remote configured — add one later (see docs/adding-remotes.md)"
+    fi
 }
 
 # ─── Phase 3: Python ──────────────────────────────────────────────────────────
@@ -240,6 +266,12 @@ phase5_claude_config() {
     mkdir -p "$PROJECT_DIR/.claude/hooks"
     mkdir -p "$PROJECT_DIR/.claude/rules"
     mkdir -p "$PROJECT_DIR/.claude/skills"
+
+    # Disable branch protection by default (single-developer workflow)
+    if [[ ! -f "$PROJECT_DIR/.claude/protected-branches" ]]; then
+        touch "$PROJECT_DIR/.claude/protected-branches"
+        log "  created .claude/protected-branches (branch protection disabled)"
+    fi
 
     # 8 dotclaude marketplace hooks
     local hook_count=0
