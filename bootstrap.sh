@@ -25,45 +25,61 @@ project-bootstrap — scaffold a complete Claude Code Python project
 
 USAGE
   cd ~/Projects
-  mkproj <name>          create and bootstrap ~/Projects/<name>
-  mkproj                 bootstrap current directory
-  mkproj --test          dry run in /tmp — all 9 phases, then validate and clean up
+  mkproj <name>          create ~/Projects/<name> and bootstrap it
+  mkproj                 bootstrap the current directory (uses folder name)
+  mkproj --test          dry run in /tmp -- all 9 phases, validate, clean up
   mkproj --help          show this message
 
 NAME RULES
   Allowed : a-z  0-9  _  -  (lowercase only)
   Rejected: spaces, uppercase, special characters
-  Examples: mkproj my-tool   mkproj cambium_temp   mkproj agent2
+  Examples: mkproj my-tool   mkproj ping-watch   mkproj agent2
+
+  If your folder already exists and has an uppercase or mixed-case name
+  (e.g. ~/Projects/Ping-Watch), bypass the launcher and call bootstrap
+  directly from inside the folder -- it will use the folder name as-is:
+
+    cd ~/Projects/Ping-Watch
+    bash ~/Projects/project-bootstrap/bootstrap.sh
 
 WHAT IT DOES (9 phases)
-  1. Preflight      — safety checks (refuses live projects, handles bare-repo collisions)
-  2. Git            — init local repo + bare repo in ~/Repositories/<name>.git
-  3. Python         — creates .venv, installs requirements.txt
-  4. Root files     — copies templates: README, .gitignore, .env.example, run.sh, test.sh, etc.
-  5. Claude config  — writes .claude/settings.json, hooks (save-response, auto-commit, marketplace)
-  6. Structure      — creates src/<name>/, tests/, docs/, tasks/, responses/
-  7. Global setup   — adds auto-venv cd override to ~/.bashrc (idempotent)
-  8. Initial commit — "Initial project scaffold" commit to bare repo
-  9. Verify         — prints summary and next steps
+  1. Preflight      -- safety checks; refuses live projects (>1 commit)
+  2. Git            -- git init on branch main; optionally creates a local
+                       bare repo in ~/Repositories/<name>.git and wires remote
+  3. Python         -- creates .venv, requirements.txt stub
+  4. Root files     -- copies templates: README, .gitignore, .env.example, etc.
+  5. Claude config  -- .claude/settings.json, 11 hooks, 4 rules
+  6. Structure      -- src/<name>/, tests/, docs/, tasks/, responses/
+  7. Global setup   -- auto-venv cd override in ~/.bashrc (idempotent)
+  8. Initial commit -- "Initial project scaffold" committed locally;
+                       pushed to remote if one was configured in phase 2
+  9. Verify         -- hooks checked, next-steps summary printed
+
+RE-RUNNING
+  Safe to re-run any time. Every phase checks before creating -- existing
+  files, dirs, and the venv are skipped. Only missing pieces are filled in.
+  Use this to recover from interrupted runs or to add the bare repo later:
+
+    cd ~/Projects/myproject
+    mkproj
 
 --test MODE
   Runs all 9 phases against a temp directory (/tmp/mkproj-test-<PID>).
   All prompts are auto-answered. No screen session is started, so all output
   is visible directly. After phase 9, a validation pass checks every expected
   file, hook, and directory. Prints PASS or FAIL with details. Cleans up on
-  exit (both project dir and bare repo).
-
-  Intended to be run from inside Claude Code so errors are visible and fixable
-  without leaving the session.
+  exit. Intended to be run from inside Claude Code so errors are visible and
+  fixable without leaving the session.
 
 PREREQUISITES
   ~/bin/mkproj must exist (run: bash ~/Projects/project-bootstrap/install.sh)
   ~/bin must be on PATH (ahead of /usr/bin to avoid conflicts)
 
-NOTES
-  Re-running is safe — every step is guarded by an existence check.
-  bootstrap.sh lives in ~/Projects/project-bootstrap; mkproj calls it directly.
-  Edit templates/ or bootstrap.sh to change what new projects look like.
+REMOTES (git)
+  Bootstrap does not force a remote. During phase 2 you are asked whether to
+  create a local bare repo in ~/Repositories/. You can skip it and add any
+  remote later -- see docs/adding-remotes.md for step-by-step instructions
+  covering local bare repos, GitHub, SourceForge, and dual-push.
 
 EOF
     exit 0

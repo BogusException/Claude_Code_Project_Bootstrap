@@ -2,20 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Response format (required on every response)
+## Response format (required on every response -- no exceptions)
 
-**First character:** Begin every response with a single ✓ character, followed immediately by a newline, then the response body. This is a health indicator — when the user stops seeing the ✓, it means Claude Code has lost its instruction context and needs to be reminded.
+**Line 1:** A single ✓ character. This is a health check -- when the user stops seeing ✓, Claude Code has lost its instruction context.
 
-**Second line:** Immediately after the ✓, read `responses/.last-saved` and report the actual filename saved by the previous Stop hook:
+**Line 2:** Read `responses/.last-saved` and report the actual saved filename:
 
 ```
 ✓
 Last saved: responses/20260828-214500.txt
 ```
 
-If `responses/.last-saved` does not exist or is empty, write `Last saved: (none yet)`. This is real confirmation from disk -- not a prediction. When the filename stops appearing or doesn't change, the Stop hook is not firing.
+If the file does not exist or is empty, write `Last saved: (none yet)`. This is real disk confirmation. If the filename stops changing between responses, the Stop hook has stopped firing.
 
-The `save-response.sh` Stop hook fires after each exchange and writes to `responses/`. The file contains only the human-readable discussion text -- not tool call output. Format:
+The `save-response.sh` Stop hook writes each exchange to `responses/YYYYMMDD-HHMMSS.txt` after the response completes. The file contains only the human-readable query and response -- no tool output:
 
 ```
 === QUERY ===
@@ -25,7 +25,13 @@ The `save-response.sh` Stop hook fires after each exchange and writes to `respon
 <Claude's response>
 ```
 
-The `responses/` directory is git-ignored (content only — the directory itself is tracked via `.gitkeep`). Never commit response files.
+`responses/` is git-ignored (content only -- the dir is tracked via `.gitkeep`). Never commit response files.
+
+## Behaviour directives (required)
+
+**Proactive:** When asking a question or presenting options, include a recommendation with brief reasoning. Do not wait to be asked which option is better. You are the expert -- act like it.
+
+**Suggestions:** If a better approach exists, say so in one line before proceeding. Do not implement it without a yes.
 
 ## Commands
 

@@ -14,13 +14,35 @@ What happens next:
 2. All 9 bootstrap phases run inside it
 3. You land in a live bash shell in that screen session, ready to work
 
-## 2. Resuming after an interrupted run
+## 2. Bootstrapping an existing or mixed-case directory
 
-If bootstrap fails mid-run (network blip, missing prereq, etc.), fix the issue and run `mkproj myproject` again. All phases are idempotent -- existing files and the venv are skipped, only missing pieces are created.
+`mkproj <name>` enforces lowercase names. If your folder already exists and has uppercase or mixed-case characters (e.g. `Ping-Watch`), run bootstrap directly from inside it -- the launcher is bypassed and the folder name is used as-is:
 
-The one exception: if the project already has more than one git commit, bootstrap refuses. That means real project work is present and running bootstrap would be a mistake.
+```bash
+cd ~/Projects/Ping-Watch
+bash ~/Projects/project-bootstrap/bootstrap.sh
+```
 
-## 3. After bootstrap completes
+This works for any folder that has zero or one git commits. Bootstrap fills in everything that is missing and skips what already exists.
+
+## 3. Re-running to fill gaps
+
+Bootstrap is fully idempotent -- every phase checks before creating. You can re-run it any time to:
+
+- Recover from an interrupted run
+- Add the local bare repo if you skipped it the first time
+- Pick up new hooks or template changes after updating project-bootstrap
+
+```bash
+cd ~/Projects/myproject
+mkproj
+```
+
+Only missing pieces are created. Existing files, the venv, and the git repo are left untouched.
+
+The one hard stop: if the project already has more than one git commit, bootstrap refuses. That means real project work is present -- running bootstrap on a live project is always a mistake.
+
+## 4. After bootstrap completes
 
 ```bash
 # Activate venv (auto-activated on cd if ~/.bashrc override is in place)
@@ -36,11 +58,11 @@ cp .env.example .env
 claude
 ```
 
-## 4. Adding git remotes
+## 5. Adding git remotes
 
 Bootstrap creates a local git repo only. To push to GitHub, a local bare repo, or another host, see [adding-remotes.md](adding-remotes.md). Remotes are optional and can be added any time after bootstrap.
 
-## 5. What every new project receives
+## 6. What every new project receives
 
 ```
 myproject/
@@ -66,7 +88,7 @@ myproject/
 └── test.sh             ← activates venv and runs tools/startup_tests.py
 ```
 
-## 6. Testing the bootstrap itself
+## 7. Testing the bootstrap itself
 
 `mkproj --test` runs all 9 phases against a throw-away directory in `/tmp`, then validates the result and cleans up. No screen session is started, so all output appears directly in the terminal (or in Claude Code's Bash tool output).
 

@@ -37,18 +37,27 @@ git push origin main
 
 The `auto-commit.sh` Stop hook is a safety net only -- Claude commits first with a meaningful message.
 
+## Behaviour directives
+
+**Proactive:** When asking a question or presenting options, always include a recommendation with brief reasoning. Do not wait for the user to ask which option is better -- state it. The user is not the expert; Claude is.
+
+**Suggestions:** If a better approach exists for any task, mention it in one line before proceeding. Do not implement it without a yes.
+
 ## Purpose
 
-This repo provides `bootstrap.sh` -- a bash script that scaffolds a complete Claude Code Python project from an empty directory. Run via `proj` (a thin launcher in `~/bin/`). All logic lives here so changes are version-controlled and take effect immediately on the next `proj` run.
+This repo provides `bootstrap.sh` -- a bash script that scaffolds a complete Claude Code Python project from an empty directory. Run via `mkproj` (a thin launcher in `~/bin/`). All logic lives here so changes are version-controlled and take effect immediately on the next `mkproj` run.
 
 ## Commands
 
 ```bash
-# Install ~/bin/proj (one-time, after cloning)
+# Install ~/bin/mkproj (one-time, after cloning)
 bash install.sh
 
-# Test the bootstrap on a new project
-mkdir ~/Projects/testproject && cd ~/Projects/testproject && proj
+# Test the bootstrap end-to-end (from inside Claude Code)
+mkproj --test
+
+# Bootstrap a new project
+cd ~/Projects && mkproj myproject
 ```
 
 ## Architecture
