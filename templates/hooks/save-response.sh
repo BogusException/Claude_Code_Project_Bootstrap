@@ -38,12 +38,16 @@ with open(path) as f:
         msg = entry.get("message", {})
         if msg.get("role") != "user":
             continue
-        content = msg.get("content", [])
-        if not isinstance(content, list):
-            continue
-        texts = [b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip()]
-        if texts:
-            last_text = "\n".join(texts)
+        content = msg.get("content", "")
+        # User-typed messages have content as a plain string
+        if isinstance(content, str) and content.strip():
+            last_text = content.strip()
+        # Some user messages are lists of blocks (tool results, etc.)
+        elif isinstance(content, list):
+            texts = [b["text"] for b in content
+                     if isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip()]
+            if texts:
+                last_text = "\n".join(texts)
 print(last_text)
 PY
   )
@@ -54,9 +58,13 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 FILE="$RESPONSES_DIR/${TIMESTAMP}.txt"
 
 {
+  printf '=== QUERY ===\n'
   if [ -n "$QUERY" ]; then
-    printf '=== QUERY ===\n%s\n\n=== RESPONSE ===\n' "$QUERY"
+    printf '%s\n' "$QUERY"
+  else
+    printf '(query not captured)\n'
   fi
+  printf '\n=== RESPONSE ===\n'
   printf '%s\n' "$RESPONSE"
 } > "$FILE"
 
