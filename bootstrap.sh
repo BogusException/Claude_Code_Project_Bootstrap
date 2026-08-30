@@ -150,28 +150,27 @@ phase1_preflight() {
         exit 1
     fi
 
-    # Detect project work already in progress — always a mistake to run bootstrap then
+    # Detect project work already in progress — always a mistake to run bootstrap then.
+    # Exception: scaffold commit + auto-commits are recoverable (bootstrap was interrupted
+    # and Claude ran in the project before it was fully set up).
     if git -C "$PROJECT_DIR" rev-parse --git-dir &>/dev/null 2>&1; then
         local count
         count=$(git -C "$PROJECT_DIR" rev-list --count HEAD 2>/dev/null || echo 0)
-        if [[ "$count" -gt 1 ]]; then
-            err "STOP: $PROJECT_NAME has $count commits — project work already exists."
-            err "Recent commits:"
-            git -C "$PROJECT_DIR" log --oneline -5 >&2
-            err ""
-            err "bootstrap is for initial setup only. Running it now would be a mistake."
-            exit 1
-        fi
-        if [[ "$count" -eq 1 ]]; then
-            local msg
-            msg=$(git -C "$PROJECT_DIR" log --format="%s" -1)
-            if [[ "$msg" != "Initial project scaffold" ]]; then
-                err "STOP: Found 1 commit but it is not the scaffold commit:"
-                err "  $msg"
-                err "Cannot safely continue."
+        if [[ "$count" -gt 0 ]]; then
+            # Check whether every commit is a scaffold or auto-commit message
+            local non_bootstrap
+            non_bootstrap=$(git -C "$PROJECT_DIR" log --format="%s" \
+                | grep -cv "^Initial project scaffold$\|^auto-commit: " || true)
+            if [[ "$non_bootstrap" -gt 0 ]]; then
+                err "STOP: $PROJECT_NAME has real project commits — cannot re-bootstrap."
+                err "Recent commits:"
+                git -C "$PROJECT_DIR" log --oneline -5 >&2
+                err ""
+                err "bootstrap is for initial setup only. Running it now would be a mistake."
                 exit 1
             fi
-            warn "Scaffold commit found — recovering from partial run. Continuing idempotently."
+            warn "Found $count scaffold/auto-commit(s) — recovering from incomplete bootstrap."
+            warn "Continuing idempotently."
         fi
     fi
 

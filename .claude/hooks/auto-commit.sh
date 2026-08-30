@@ -11,6 +11,10 @@ cd "$PROJ" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# Do not auto-commit if no remote is configured -- accumulating commits
+# in a remote-less repo makes it impossible to re-run bootstrap to finish setup.
+git remote get-url origin >/dev/null 2>&1 || exit 0
+
 if git diff --quiet && git diff --cached --quiet && [ -z "$(git status --porcelain)" ]; then
   exit 0
 fi
