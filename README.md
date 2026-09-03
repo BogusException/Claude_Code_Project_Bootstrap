@@ -2,6 +2,8 @@
 
 One command that turns an empty folder into a fully configured [Claude Code](https://claude.ai/code) Python development environment.
 
+Thankfully written completely in clade code!
+
 ```bash
 cd ~/Projects
 mkproj myproject
