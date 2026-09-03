@@ -687,7 +687,7 @@ phase9_verify() {
 
     # Build command array (array avoids glob expansion on brackets in model names)
     local cmd_args=("claude")
-    [[ "$bypass" == "true" ]] && cmd_args+=("--dangerouslySkipPermissions")
+    [[ "$bypass" == "true" ]] && cmd_args+=("--dangerously-skip-permissions")
     cmd_args+=("--model" "$model_val")
     cmd_args+=("--effort" "$effort_val")
 
