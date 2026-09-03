@@ -17,7 +17,7 @@ That's it. A named `screen` session opens, 9 setup phases run, and you land in a
 |----------|---------------|
 | **Version control** | Local git repo (remotes optional -- add any time; see [docs/adding-remotes.md](docs/adding-remotes.md)) |
 | **Python** | `.venv`, `requirements.txt` stub |
-| **Claude Code** | `settings.json`, 11 hooks, 4 code-quality rules |
+| **Claude Code** | `settings.json`, 10 hooks, 4 code-quality rules |
 | **Project structure** | `docs/`, `tasks/`, `responses/`, `run.sh`, `test.sh` |
 | **Standing instructions** | `CLAUDE.md` with git workflow, response format, and behavioural rules |
 | **Shell** | Named `screen` session, auto-venv `cd` override in `~/.bashrc` |

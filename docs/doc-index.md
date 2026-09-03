@@ -46,7 +46,7 @@ Section references use the format: `filename §N.N`
 **M**
 
 **mkproj --help** -- usage.md §1
-**mkproj --test** -- usage.md §6
+**mkproj --test** -- usage.md §7
 
 **P**
 
@@ -58,7 +58,7 @@ Section references use the format: `filename §N.N`
 **Reading order** -- overview.md §5
 **Remote repo** -- adding-remotes.md §1
 **Requirements (prerequisites)** -- install.md §1
-**responses/ directory** -- usage.md §5
+**responses/ directory** -- usage.md §6
 
 **S**
 
@@ -70,7 +70,7 @@ Section references use the format: `filename §N.N`
 
 **T**
 
-**tasks/ directory** -- usage.md §5
+**tasks/ directory** -- usage.md §6
 **Templates** -- customizing.md §1
 **Troubleshooting** -- troubleshooting.md
 

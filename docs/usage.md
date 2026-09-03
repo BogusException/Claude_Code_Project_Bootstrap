@@ -50,7 +50,7 @@ Bootstrap handles the setup steps automatically before launching Claude Code:
 
 - **pip install** — runs against the empty requirements.txt stub (fast; adds your deps later)
 - **.env created** — `.env.example` is copied to `.env`; fill in any API keys you need
-- **Bypass permissions?** `[Y/n]` — adds `--dangerouslySkipPermissions`; default Yes (all key permissions are pre-wired in `settings.json`)
+- **Bypass permissions?** `[Y/n]` — adds `--dangerously-skip-permissions`; default Yes (all key permissions are pre-wired in `settings.json`)
 - **Model?** — numbered list 1–8 from haiku to best; default 2 = sonnet
 - **Effort?** — numbered list 1–4 (low / medium / high / max); default 2 = medium
 - Claude Code launches with your chosen flags
@@ -71,7 +71,7 @@ Bootstrap creates a local git repo only. To push to GitHub, a local bare repo, o
 ```
 myproject/
 ├── .claude/
-│   ├── hooks/          ← 11 hooks: safety guards, save-response, auto-commit, auto-import-skill
+│   ├── hooks/          ← 10 hooks: 8 marketplace safety guards + save-response + auto-commit
 │   ├── rules/          ← 4 dotclaude code-quality rules
 │   ├── skills/         ← auto-populated by auto-import-skill hook as skills are used
 │   └── settings.json   ← permissions + full hook wiring
