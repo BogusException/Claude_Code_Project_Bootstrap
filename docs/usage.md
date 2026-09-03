@@ -11,10 +11,11 @@ mkproj myproject
 
 What happens next:
 1. A `screen` session named `myproject` is created
-2. Two prompts before phases begin: bare repo? then a summary + Proceed? (both default Yes)
-3. All 9 bootstrap phases run inside the screen session
-4. Three more prompts after phases complete: bypass permissions? model? effort?
-5. Claude Code launches automatically in the new project directory
+2. **First prompt:** confirm project name and full path — bail out here if you ran it in the wrong place
+3. Two more prompts before phases begin: bare repo? then a full summary + Proceed? (all default Yes)
+4. All 9 bootstrap phases run inside the screen session
+5. Three prompts after phases complete: bypass permissions? model? effort?
+6. Claude Code launches automatically in the new project directory
 
 ## 2. Bootstrapping an existing or mixed-case directory
 

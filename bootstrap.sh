@@ -44,15 +44,17 @@ NAME RULES
 
 INTERACTIVE PROMPTS
   Before the 9 phases run:
-  1. Local bare repo?      -- [Y/n]; creates ~/Repositories/<name>.git; default Yes
-  2. Summary + Proceed?    -- shows what will be created; [Y/n] to continue; default Yes
+  1. Confirm path?         -- shows project name + full path; [Y/n] to proceed; default Yes
+                              if wrong: abort early with no changes made
+  2. Local bare repo?      -- [Y/n]; creates ~/Repositories/<name>.git; default Yes
+  3. Summary + Proceed?    -- shows everything that will be created; [Y/n]; default Yes
 
   After the 9 phases complete:
-  3. Bypass permissions?   -- adds --dangerously-skip-permissions to claude launch; default Yes
-  4. Model choice          -- numbered list (haiku → best); default 2 = sonnet
-  5. Effort choice         -- numbered list (low → max); default 2 = medium
+  4. Bypass permissions?   -- adds --dangerously-skip-permissions to claude launch; default Yes
+  5. Model choice          -- numbered list (haiku → best); default 2 = sonnet
+  6. Effort choice         -- numbered list (low → max); default 2 = medium
 
-  Claude launches automatically after prompt 5.
+  Claude launches automatically after prompt 6.
 
 WHAT IT DOES (9 phases)
   1. Preflight      -- safety checks; refuses live projects (>1 commit)
@@ -150,6 +152,22 @@ fi
 phase1_preflight() {
     log "=== Phase 1: Preflight ==="
 
+    # ── First: confirm the project name and path before touching anything ─────
+    if [[ "$TEST_MODE" != "true" ]]; then
+        echo ""
+        log "  Project : $PROJECT_NAME"
+        log "  Dir     : $PROJECT_DIR"
+        echo ""
+        read -r -p "Bootstrap '$PROJECT_NAME' in $PROJECT_DIR? [Y/n]: " path_confirm
+        if [[ "${path_confirm,,}" == "n" ]]; then
+            err "Aborted."
+            err "  To use a specific name : cd ~/Projects && mkproj <name>"
+            err "  To use current dir     : cd <directory> && mkproj"
+            exit 1
+        fi
+        echo ""
+    fi
+
     # Prerequisites
     local missing=()
     if ! python3 --version 2>/dev/null | grep -qE "3\.(1[2-9]|[2-9][0-9])"; then
@@ -192,8 +210,7 @@ phase1_preflight() {
         return
     fi
 
-    # Ask about bare repo first, so the summary can reflect the choice
-    echo ""
+    # Ask about bare repo next, so the summary can reflect the choice
     read -r -p "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " local_repo_ans
     if [[ "${local_repo_ans,,}" != "n" ]]; then
         SETUP_LOCAL_REPO=true
