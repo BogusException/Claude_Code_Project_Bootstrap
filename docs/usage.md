@@ -11,8 +11,10 @@ mkproj myproject
 
 What happens next:
 1. A `screen` session named `myproject` is created
-2. All 9 bootstrap phases run inside it
-3. You land in a live bash shell in that screen session, ready to work
+2. Two prompts before phases begin: bare repo? then a summary + Proceed? (both default Yes)
+3. All 9 bootstrap phases run inside the screen session
+4. Three more prompts after phases complete: bypass permissions? model? effort?
+5. Claude Code launches automatically in the new project directory
 
 ## 2. Bootstrapping an existing or mixed-case directory
 
@@ -44,18 +46,20 @@ The one hard stop: if the project already has more than one git commit, bootstra
 
 ## 4. After bootstrap completes
 
+Bootstrap handles the setup steps automatically before launching Claude Code:
+
+- **pip install** — runs against the empty requirements.txt stub (fast; adds your deps later)
+- **.env created** — `.env.example` is copied to `.env`; fill in any API keys you need
+- **Bypass permissions?** `[Y/n]` — adds `--dangerouslySkipPermissions`; default Yes (all key permissions are pre-wired in `settings.json`)
+- **Model?** — numbered list 1–8 from haiku to best; default 2 = sonnet
+- **Effort?** — numbered list 1–4 (low / medium / high / max); default 2 = medium
+- Claude Code launches with your chosen flags
+
+To add dependencies later:
+
 ```bash
-# Activate venv (auto-activated on cd if ~/.bashrc override is in place)
-source .venv/bin/activate
-
-# Add dependencies to requirements.txt, then install
-pip install -r requirements.txt
-
-# Copy and fill in API keys
-cp .env.example .env
-
-# Start Claude Code
-claude
+# Edit requirements.txt, then:
+pip install -r requirements.txt   # venv auto-activates on cd if ~/.bashrc override is in place
 ```
 
 ## 5. Adding git remotes

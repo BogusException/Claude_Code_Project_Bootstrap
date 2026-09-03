@@ -42,18 +42,27 @@ NAME RULES
     cd ~/Projects/Ping-Watch
     bash ~/Projects/project-bootstrap/bootstrap.sh
 
+INTERACTIVE PROMPTS
+  1. Local bare repo?      -- [Y/n] asked before the summary; default Yes
+  2. Summary + Proceed?    -- what will be created; [Y/n] to continue; default Yes
+  3. Bypass permissions?   -- adds --dangerouslySkipPermissions to claude launch; default Yes
+  4. Model choice          -- numbered list (haiku → best); default 2 = sonnet
+  5. Effort choice         -- numbered list (low → max); default 2 = medium
+
+  After answering, bootstrap runs all 9 phases, then launches claude automatically.
+
 WHAT IT DOES (9 phases)
   1. Preflight      -- safety checks; refuses live projects (>1 commit)
   2. Git            -- git init on branch main; optionally creates a local
                        bare repo in ~/Repositories/<name>.git and wires remote
-  3. Python         -- creates .venv, requirements.txt stub
+  3. Python         -- creates .venv, runs pip install (stub, fast)
   4. Root files     -- copies templates: README, .gitignore, .env.example, etc.
-  5. Claude config  -- .claude/settings.json, 11 hooks, 4 rules
+  5. Claude config  -- .claude/settings.json, marketplace hooks, 2 custom hooks, 4 rules
   6. Structure      -- src/<name>/, tests/, docs/, tasks/, responses/
   7. Global setup   -- auto-venv cd override in ~/.bashrc (idempotent)
   8. Initial commit -- "Initial project scaffold" committed locally;
                        pushed to remote if one was configured in phase 2
-  9. Verify         -- hooks checked, next-steps summary printed
+  9. Verify + launch -- hooks checked; .env.example copied to .env; claude launched
 
 RE-RUNNING
   Safe to re-run any time. Every phase checks before creating -- existing
@@ -76,7 +85,7 @@ PREREQUISITES
   ~/bin must be on PATH (ahead of /usr/bin to avoid conflicts)
 
 REMOTES (git)
-  Bootstrap does not force a remote. During phase 2 you are asked whether to
+  Bootstrap does not force a remote. The very first prompt asks whether to
   create a local bare repo in ~/Repositories/. You can skip it and add any
   remote later -- see docs/adding-remotes.md for step-by-step instructions
   covering local bare repos, GitHub, SourceForge, and dual-push.
@@ -174,24 +183,41 @@ phase1_preflight() {
         fi
     fi
 
-    log ""
-    log "  Project : $PROJECT_NAME"
-    log "  Dir     : $PROJECT_DIR"
-    [[ "$TEST_MODE" == "true" ]] && log "  Mode    : TEST (auto-confirmed, will clean up)"
-    log ""
     if [[ "$TEST_MODE" == "true" ]]; then
-        confirm="y"
-        local_repo_ans="n"
-    else
-        read -r -p "Proceed with bootstrap? [y/N]: " confirm
-        [[ "${confirm,,}" == "y" ]] || { err "Aborted."; exit 1; }
-        echo ""
-        read -r -p "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " local_repo_ans
+        SETUP_LOCAL_REPO=true
+        BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
+        return
     fi
+
+    # Ask about bare repo first, so the summary can reflect the choice
+    echo ""
+    read -r -p "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " local_repo_ans
     if [[ "${local_repo_ans,,}" != "n" ]]; then
         SETUP_LOCAL_REPO=true
         BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
     fi
+
+    # Summary of what will be created
+    echo ""
+    log "What will be set up:"
+    log "  Project : $PROJECT_NAME"
+    log "  Dir     : $PROJECT_DIR"
+    log "  Git     : branch main"
+    if [[ "$SETUP_LOCAL_REPO" == "true" ]]; then
+        log "  Remote  : ~/Repositories/$PROJECT_NAME.git  (bare repo)"
+    else
+        log "  Remote  : none  (add later — docs/adding-remotes.md)"
+    fi
+    log "  Python  : .venv + requirements.txt stub"
+    log "  Files   : CLAUDE.md  README.md  .gitignore  .env.example  run.sh  test.sh"
+    log "  Claude  : settings.json + $(ls "$MARKETPLACE_HOOKS"/*.sh 2>/dev/null | wc -l | tr -d ' ') marketplace hooks + 2 custom hooks + 4 rules"
+    log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
+    log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
+    echo ""
+
+    read -r -p "Proceed? [Y/n]: " confirm
+    [[ "${confirm,,}" == "n" ]] && { err "Aborted."; exit 1; }
+    echo ""
 }
 
 # ─── Phase 2: Git ─────────────────────────────────────────────────────────────
@@ -590,13 +616,87 @@ phase9_verify() {
 
     echo ""
     log "Bootstrap complete. $PROJECT_NAME is ready."
+
+    # Install dependencies (empty stub — runs fast; venv already created in phase 3)
     echo ""
-    log "Next steps:"
-    log "  1. Edit requirements.txt"
-    log "     source .venv/bin/activate && pip install -r requirements.txt"
-    log "  2. Copy .env.example → .env and fill in API keys"
-    log "  3. Add a git remote when ready (see docs/adding-remotes.md)"
-    log "  4. Start coding: claude"
+    log "Installing dependencies..."
+    "$PROJECT_DIR/.venv/bin/pip" install -r "$PROJECT_DIR/requirements.txt" -q
+    log "  Done"
+
+    # Copy .env.example → .env so the project is ready for API keys
+    if [[ ! -f "$PROJECT_DIR/.env" ]]; then
+        cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+        log "  Copied .env.example → .env  (fill in any API keys before starting)"
+    else
+        log "  .env already exists — skipping copy"
+    fi
+
+    # ── Claude Code launch options ────────────────────────────────────────────
+    echo ""
+    log "Configure Claude Code launch:"
+    echo ""
+
+    # Bypass permission prompts?
+    read -r -p "  Bypass permission prompts? [Y/n]: " bypass_ans
+    local bypass=false
+    [[ "${bypass_ans,,}" != "n" ]] && bypass=true
+
+    # Model selection
+    echo ""
+    log "  Model:"
+    log "    1) haiku        — fast, lightweight tasks"
+    log "    2) sonnet       — standard daily coding  [default]"
+    log "    3) sonnet[1m]   — sonnet with 1M context window"
+    log "    4) opus         — complex architectural tasks"
+    log "    5) opusplan     — opus for planning, sonnet for execution"
+    log "    6) fable        — deep reasoning, long autonomous sessions"
+    log "    7) fable[1m]    — fable with 1M context window"
+    log "    8) best         — latest fable or opus (plan-dependent)"
+    echo ""
+    read -r -p "  Choose model [1-8, default 2]: " model_choice
+    local model_val
+    case "${model_choice:-2}" in
+        1) model_val="haiku" ;;
+        2) model_val="sonnet" ;;
+        3) model_val="sonnet[1m]" ;;
+        4) model_val="opus" ;;
+        5) model_val="opusplan" ;;
+        6) model_val="fable" ;;
+        7) model_val="fable[1m]" ;;
+        8) model_val="best" ;;
+        *) model_val="sonnet" ;;
+    esac
+
+    # Effort selection
+    echo ""
+    log "  Effort:"
+    log "    1) low"
+    log "    2) medium   [default]"
+    log "    3) high"
+    log "    4) max"
+    echo ""
+    read -r -p "  Choose effort [1-4, default 2]: " effort_choice
+    local effort_val
+    case "${effort_choice:-2}" in
+        1) effort_val="low" ;;
+        2) effort_val="medium" ;;
+        3) effort_val="high" ;;
+        4) effort_val="max" ;;
+        *) effort_val="medium" ;;
+    esac
+
+    # Build command array (array avoids glob expansion on brackets in model names)
+    local cmd_args=("claude")
+    [[ "$bypass" == "true" ]] && cmd_args+=("--dangerouslySkipPermissions")
+    cmd_args+=("--model" "$model_val")
+    cmd_args+=("--effort" "$effort_val")
+
+    echo ""
+    log "Launching: ${cmd_args[*]}"
+    echo ""
+
+    cd "$PROJECT_DIR"
+    exec "${cmd_args[@]}"
 }
 
 # ─── Test validation ──────────────────────────────────────────────────────────
@@ -684,7 +784,8 @@ phase9_test_validate() {
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
     echo ""
-    log "project-bootstrap → $PROJECT_NAME"
+    log "project-bootstrap — setting up '$PROJECT_NAME'"
+    log "Scaffolds a complete Claude Code Python project from scratch."
     echo ""
 
     phase1_preflight
