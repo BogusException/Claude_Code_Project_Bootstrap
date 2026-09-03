@@ -45,7 +45,7 @@ NAME RULES
 INTERACTIVE PROMPTS
   1. Local bare repo?      -- [Y/n] asked before the summary; default Yes
   2. Summary + Proceed?    -- what will be created; [Y/n] to continue; default Yes
-  3. Bypass permissions?   -- adds --dangerouslySkipPermissions to claude launch; default Yes
+  3. Bypass permissions?   -- adds --dangerously-skip-permissions to claude launch; default Yes
   4. Model choice          -- numbered list (haiku → best); default 2 = sonnet
   5. Effort choice         -- numbered list (low → max); default 2 = medium
 
