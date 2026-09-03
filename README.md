@@ -49,6 +49,8 @@ See [docs/install.md](docs/install.md) for full details.
 
 ```bash
 mkproj myproject          # creates ~/Projects/myproject and bootstraps it
+mkproj                    # bootstraps the current directory (uses folder name as project name)
+mkproj --test             # dry run in /tmp — validates all phases, then cleans up
 mkproj --help             # full usage and phase list
 ```
 
@@ -70,7 +72,7 @@ Bootstrap runs 9 sequential phases inside a `screen` session:
 6. **Structure** — `docs/`, `tasks/`, `responses/`, `run.sh`, `test.sh`
 7. **Global setup** — `~/.bashrc` entries, global Claude hook (idempotent)
 8. **Initial commit** — "Initial project scaffold" committed locally (pushed if a remote exists)
-9. **Verify** — hook permissions, next-steps summary
+9. **Verify + launch** — hook permissions, pip install, `.env` copied, model/effort prompts, claude launched
 
 See [docs/how-it-works.md](docs/how-it-works.md) for internals, hook inventory, and `settings.json` structure.
 
