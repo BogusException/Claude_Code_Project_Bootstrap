@@ -161,8 +161,6 @@ phase1_preflight() {
         read -r -p "Bootstrap '$PROJECT_NAME' in $PROJECT_DIR? [Y/n]: " path_confirm
         if [[ "${path_confirm,,}" == "n" ]]; then
             err "Aborted."
-            err "  To use a specific name : cd ~/Projects && mkproj <name>"
-            err "  To use current dir     : cd <directory> && mkproj"
             exit 1
         fi
         echo ""
