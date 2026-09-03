@@ -43,13 +43,16 @@ NAME RULES
     bash ~/Projects/project-bootstrap/bootstrap.sh
 
 INTERACTIVE PROMPTS
-  1. Local bare repo?      -- [Y/n] asked before the summary; default Yes
-  2. Summary + Proceed?    -- what will be created; [Y/n] to continue; default Yes
+  Before the 9 phases run:
+  1. Local bare repo?      -- [Y/n]; creates ~/Repositories/<name>.git; default Yes
+  2. Summary + Proceed?    -- shows what will be created; [Y/n] to continue; default Yes
+
+  After the 9 phases complete:
   3. Bypass permissions?   -- adds --dangerously-skip-permissions to claude launch; default Yes
   4. Model choice          -- numbered list (haiku → best); default 2 = sonnet
   5. Effort choice         -- numbered list (low → max); default 2 = medium
 
-  After answering, bootstrap runs all 9 phases, then launches claude automatically.
+  Claude launches automatically after prompt 5.
 
 WHAT IT DOES (9 phases)
   1. Preflight      -- safety checks; refuses live projects (>1 commit)
