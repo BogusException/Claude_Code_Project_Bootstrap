@@ -44,15 +44,14 @@ NAME RULES
 
 INTERACTIVE PROMPTS
   Before the 9 phases run:
-  1. Confirm path?         -- shows project name + full path; [Y/n] to proceed; default Yes
-                              if wrong: abort early with no changes made
-  2. Local bare repo?      -- [Y/n]; creates ~/Repositories/<name>.git; default Yes
-  3. Summary + Proceed?    -- shows everything that will be created; [Y/n]; default Yes
+  1. Confirm path?         -- [Y/n]  project name + full path; No exits immediately, no changes
+  2. Local bare repo?      -- [Y/n]  creates ~/Repositories/<name>.git; default Yes
+  3. Summary + Proceed?    -- [Y/n]  shows everything that will be created; default Yes
 
   After the 9 phases complete:
-  4. Bypass permissions?   -- adds --dangerously-skip-permissions to claude launch; default Yes
-  5. Model choice          -- numbered list (haiku → best); default 2 = sonnet
-  6. Effort choice         -- numbered list (low → max); default 2 = medium
+  4. Bypass permissions?   -- [Y/n]  adds --dangerously-skip-permissions to claude; default Yes
+  5. Model choice          -- [1-8]  haiku → best; default 2 = sonnet
+  6. Effort choice         -- [1-4]  low → max; default 2 = medium
 
   Claude launches automatically after prompt 6.
 

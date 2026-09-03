@@ -51,9 +51,9 @@ Bootstrap handles the setup steps automatically before launching Claude Code:
 
 - **pip install** — runs against the empty requirements.txt stub (fast; adds your deps later)
 - **.env created** — `.env.example` is copied to `.env`; fill in any API keys you need
-- **Bypass permissions?** `[Y/n]` — adds `--dangerously-skip-permissions`; default Yes (all key permissions are pre-wired in `settings.json`)
-- **Model?** — numbered list 1–8 from haiku to best; default 2 = sonnet
-- **Effort?** — numbered list 1–4 (low / medium / high / max); default 2 = medium
+- **Bypass permissions?** — `[Y/n]` adds `--dangerously-skip-permissions`; default Yes (permissions pre-wired in `settings.json`)
+- **Model?** — `[1-8]` haiku to best; default 2 = sonnet
+- **Effort?** — `[1-4]` low / medium / high / max; default 2 = medium
 - Claude Code launches with your chosen flags
 
 To add dependencies later:
