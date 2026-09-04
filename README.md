@@ -1,6 +1,14 @@
 # project-bootstrap
 
-One command that turns an empty folder into a fully configured [Claude Code](https://claude.ai/code) Python development environment.
+One command that either:
+- turns an empty folder into a fully configured [Claude Code](https://claude.ai/code) Python development environment. The project name is taken from the folder name.
+
+```bash
+cd ~/Projects/myproject
+mkproj
+```
+
+- or, ran with a project name in the command line, creates the project folder under the current one.
 
 Thankfully written completely in clade code!
 
