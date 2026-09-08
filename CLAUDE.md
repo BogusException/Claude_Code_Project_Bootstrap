@@ -64,9 +64,10 @@ cd ~/Projects && mkproj myproject
 
 ```
 bootstrap.sh          ← all logic; 9 sequential phases
-install.sh            ← creates ~/bin/proj (thin launcher, never changes)
+install.sh            ← creates ~/bin/mkproj (thin launcher, never changes)
 templates/            ← files copied verbatim (or with {{PROJECT_NAME}} substitution) into new projects
-  hooks/              ← save-response.sh, auto-commit.sh, auto-import-skill.sh (maintained here)
+  hooks/              ← all .claude/hooks/ scripts (11 total); maintained here, no external dependencies
+  rules/              ← all .claude/rules/ markdown files (4 total); maintained here
   docs/               ← 8 stub doc files for new projects
   tasks/              ← todo.md, skills-manifest.md stubs
   CLAUDE.md           ← the CLAUDE.md that new projects receive
@@ -80,9 +81,8 @@ projSetup.md          ← original spec (reference only)
 - `bootstrap.sh` is **idempotent**: every file/dir creation is guarded by an existence check. Re-running after a failed run is safe.
 - It **stops hard** if the target project has more than 1 commit, or has 1 commit that is not "Initial project scaffold". Running bootstrap on a live project is always a mistake.
 - The bare repo collision (existing `~/Repositories/<name>.git`) surfaces a `[d/o/q]` prompt. `q`/Enter is the safe default.
-- `~/bin/proj` calls `exec bootstrap.sh` -- one hop, no indirection.
-- The 8 dotclaude marketplace hooks are copied by glob from `~/.claude/plugins/marketplaces/dotclaude/hooks/*.sh`. New marketplace hooks are picked up automatically.
-- `save-response.sh`, `auto-commit.sh`, and `auto-import-skill.sh` are bundled in `templates/hooks/` (not from the marketplace).
+- `~/bin/mkproj` calls `exec bootstrap.sh` -- one hop, no indirection.
+- All hooks and rules are bundled in `templates/`. No external marketplace dependency.
 - `generate_settings_json()` uses `<<'EOF'` so `$CLAUDE_PROJECT_DIR` is written literally into the JSON for Claude Code to expand at runtime.
 
 ## Modifying
