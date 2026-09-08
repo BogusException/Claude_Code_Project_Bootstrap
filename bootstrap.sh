@@ -5,8 +5,6 @@ set -euo pipefail
 
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
-MARKETPLACE_HOOKS="$HOME/.claude/plugins/marketplaces/dotclaude/hooks"
-MARKETPLACE_RULES="$HOME/.claude/plugins/marketplaces/dotclaude/rules"
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
 BARE_REPO=""
@@ -61,7 +59,7 @@ WHAT IT DOES (9 phases)
                        bare repo in ~/Repositories/<name>.git and wires remote
   3. Python         -- creates .venv, runs pip install (stub, fast)
   4. Root files     -- copies templates: README, .gitignore, .env.example, etc.
-  5. Claude config  -- .claude/settings.json, marketplace hooks, 2 custom hooks, 4 rules
+  5. Claude config  -- .claude/settings.json, hooks (from templates/), 4 rules (from templates/)
   6. Structure      -- src/<name>/, tests/, docs/, tasks/, responses/
   7. Global setup   -- auto-venv cd override in ~/.bashrc (idempotent)
   8. Initial commit -- "Initial project scaffold" committed locally;
@@ -227,7 +225,7 @@ phase1_preflight() {
     fi
     log "  Python  : .venv + requirements.txt stub"
     log "  Files   : CLAUDE.md  README.md  .gitignore  .env.example  run.sh  test.sh"
-    log "  Claude  : settings.json + $(ls "$MARKETPLACE_HOOKS"/*.sh 2>/dev/null | wc -l | tr -d ' ') marketplace hooks + 2 custom hooks + 4 rules"
+    log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
     log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
     log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
     echo ""
@@ -331,49 +329,31 @@ phase5_claude_config() {
         log "  created .claude/protected-branches (branch protection disabled)"
     fi
 
-    # 8 dotclaude marketplace hooks
+    # All hooks bundled in templates/hooks/
     local hook_count=0
-    if [[ -d "$MARKETPLACE_HOOKS" ]]; then
-        while IFS= read -r -d '' hook; do
-            local name; name="$(basename "$hook")"
-            local dst="$PROJECT_DIR/.claude/hooks/$name"
-            if [[ ! -f "$dst" ]]; then
-                cp "$hook" "$dst"
-                chmod +x "$dst"
-                log "  hook (marketplace): $name"
-                ((hook_count++)) || true
-            fi
-        done < <(find "$MARKETPLACE_HOOKS" -maxdepth 1 -name "*.sh" -print0 2>/dev/null)
-    else
-        warn "  Marketplace hooks not found: $MARKETPLACE_HOOKS"
-    fi
-
-    # 2 custom hooks bundled with project-bootstrap
-    for hook in save-response.sh auto-commit.sh; do
-        local dst="$PROJECT_DIR/.claude/hooks/$hook"
+    while IFS= read -r -d '' hook; do
+        local name; name="$(basename "$hook")"
+        local dst="$PROJECT_DIR/.claude/hooks/$name"
         if [[ ! -f "$dst" ]]; then
-            cp "$TEMPLATES_DIR/hooks/$hook" "$dst"
+            cp "$hook" "$dst"
             chmod +x "$dst"
-            log "  hook (custom): $hook"
+            log "  hook: $name"
             ((hook_count++)) || true
         fi
-    done
-
+    done < <(find "$TEMPLATES_DIR/hooks" -maxdepth 1 -name "*.sh" -print0 2>/dev/null)
     [[ $hook_count -eq 0 ]] && log "  all hooks already present — skipping"
 
-    # 4 rules from marketplace
+    # 4 rules bundled in templates/rules/
     local rule_count=0
-    for rule in code-quality.md database.md error-handling.md security.md; do
-        local src="$MARKETPLACE_RULES/$rule"
-        local dst="$PROJECT_DIR/.claude/rules/$rule"
-        if [[ -f "$src" && ! -f "$dst" ]]; then
-            cp "$src" "$dst"
-            log "  rule: $rule"
+    while IFS= read -r -d '' rule; do
+        local name; name="$(basename "$rule")"
+        local dst="$PROJECT_DIR/.claude/rules/$name"
+        if [[ ! -f "$dst" ]]; then
+            cp "$rule" "$dst"
+            log "  rule: $name"
             ((rule_count++)) || true
-        elif [[ ! -f "$src" ]]; then
-            warn "  rule not found in marketplace: $rule"
         fi
-    done
+    done < <(find "$TEMPLATES_DIR/rules" -maxdepth 1 -name "*.md" -print0 2>/dev/null)
     [[ $rule_count -eq 0 ]] && log "  all rules already present — skipping"
 
     # settings.json
