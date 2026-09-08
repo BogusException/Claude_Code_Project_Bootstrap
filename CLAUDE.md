@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **First character:** Begin every response with a single ✓ character followed by a newline, then the response body. This is a health indicator -- when the user stops seeing ✓, Claude Code has lost its instruction context.
 
-**Last lines of every response:** Read `responses/.last-saved` and end with:
+**Last lines of every response:** Invoke the Read tool on `responses/.last-saved` -- this is a mandatory tool call, not a knowledge-based answer. End with:
 
 ```
 ---
 Previous exchange saved: responses/20260830-180050.txt
 ```
 
-If `responses/.last-saved` does not exist or is empty, write `Previous exchange saved: (none yet)`. This is real confirmation from disk -- the `save-response.sh` Stop hook writes it after each exchange. When the filename stops changing between responses, the hook has stopped firing.
+If the Read tool returns empty content or the file does not exist, write `Previous exchange saved: (none yet)`. Never hardcode `(none yet)` without attempting the Read first. This is real confirmation from disk -- the `save-response.sh` Stop hook writes it after each exchange. When the filename stops changing between responses, the hook has stopped firing.
 
 The saved file contains only the human-readable query and response (not tool output):
 
