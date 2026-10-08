@@ -1,7 +1,7 @@
 # project-bootstrap
 
 One command that either:
-- turns an empty folder into a fully configured [Claude Code](https://claude.ai/code) Python development environment. The project name is taken from the folder name.
+- turns an empty folder into a fully configured [Claude Code](https://claude.ai/code) Python development environment — git, venv, hooks, rules, and a `CLAUDE.md` included. The project name is taken from the folder name.
 
 ```bash
 cd ~/Projects/myproject
@@ -9,8 +9,6 @@ mkproj
 ```
 
 - or, ran with a project name in the command line, creates the project folder under the current one.
-
-Thankfully written completely in clade code!
 
 ```bash
 cd ~/Projects
@@ -45,8 +43,8 @@ That's it. A named `screen` session opens, 9 setup phases run, and you land in a
 
 ```bash
 cd ~/Projects
-git clone https://github.com/BogusException/project-bootstrap
-cd project-bootstrap
+git clone https://github.com/BogusException/Claude_Code_Project_Bootstrap
+cd Claude_Code_Project_Bootstrap
 bash install.sh
 # Add ~/bin to PATH if prompted, then: source ~/.bashrc
 ```
