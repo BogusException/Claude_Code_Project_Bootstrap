@@ -7,26 +7,41 @@ cd ~/Projects
 mkproj myproject
 ```
 
-`mkproj` accepts the project name as an argument and creates the directory if it does not exist. Name rules: lowercase letters, digits, underscores only; must start with a letter (`my_tool`, `agent2`, `cambium_temp`). Hyphens are rejected because the project name becomes the Python package directory (`src/<name>/`), and hyphens are not valid Python identifiers.
+`mkproj` accepts the project name as an argument and creates the directory if it does not exist.
+
+### Name rules
+
+Applies to the project directory name only. Parent directories in the path are not checked -- `/home/pat/my-projects/my_tool` is fine; only `my_tool` is validated.
+
+- Allowed characters: `a-z`, `0-9`, `_`
+- Must start with a lowercase letter
+- Rejected: hyphens, uppercase letters, spaces, any other character
+
+Hyphens are rejected specifically because the project name becomes the Python package directory (`src/<name>/__init__.py`), and hyphens are not valid Python identifiers. Use an underscore instead: `my_tool` not `my-tool`.
+
+These rules apply uniformly regardless of how you invoke bootstrap: `mkproj blah_foo` (name as argument) and `cd blah_foo && mkproj` (name derived from current directory) both run the same check.
+
+Valid: `my_tool`, `agent2024`, `cambium_temp`
+Invalid: `my-tool` (hyphen), `MyTool` (uppercase), `2bad` (starts with digit), `my tool` (space)
 
 What happens next:
 1. A `screen` session named `myproject` is created
-2. **First prompt:** confirm project name and full path — bail out here if you ran it in the wrong place
+2. **First prompt:** confirm project name and full path -- bail out here if you ran it in the wrong place
 3. Two more prompts before phases begin: bare repo? then a full summary + Proceed? (all default Yes)
 4. All 9 bootstrap phases run inside the screen session
 5. Three prompts after phases complete: bypass permissions? model? effort?
 6. Claude Code launches automatically in the new project directory
 
-## 2. Bootstrapping an existing or mixed-case directory
+## 2. Bootstrapping an existing empty directory
 
-`mkproj <name>` enforces lowercase names. If your folder already exists and has uppercase or mixed-case characters (e.g. `Ping-Watch`), run bootstrap directly from inside it -- the launcher is bypassed and the folder name is used as-is:
+If the directory already exists (e.g. you created it manually), `cd` into it and run `mkproj` with no arguments. Bootstrap derives the project name from the current directory name and applies the same validation:
 
 ```bash
-cd ~/Projects/Ping-Watch
-bash ~/Projects/project-bootstrap/bootstrap.sh
+cd ~/Projects/my_tool
+mkproj
 ```
 
-This works for any folder that has zero or one git commits. Bootstrap fills in everything that is missing and skips what already exists.
+This works for any folder with zero or one git commits. Bootstrap fills in everything that is missing and skips what already exists.
 
 ## 3. Re-running to fill gaps
 
@@ -108,6 +123,8 @@ What it checks after the phases complete:
 - Every expected file and directory exists (CLAUDE.md, .gitignore, .venv, hooks, rules, docs, tasks, responses, src/)
 - Every hook script is executable
 - `settings.json` is valid JSON
+- Name validation rejects hyphens, uppercase, names starting with a digit, and special characters
+- Name validation accepts all legal names
 
 Prints `PASS` or `FAIL` per check, then removes the temp project.
 
