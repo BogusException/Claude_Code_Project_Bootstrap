@@ -29,15 +29,20 @@ USAGE
   mkproj --help          show this message
 
 NAME RULES
-  Allowed : a-z  0-9  _  -  (lowercase only)
-  Rejected: spaces, uppercase, special characters
-  Examples: mkproj my-tool   mkproj ping-watch   mkproj agent2
+  Allowed : a-z  0-9  _  (lowercase, underscore only; must start with a letter)
+  Rejected: hyphens, spaces, uppercase, special characters
+
+  Hyphens are rejected because the project name becomes the Python package
+  directory (src/<name>/__init__.py). Hyphens are not valid Python identifiers.
+  Use an underscore: mkproj ping_watch  not  mkproj ping-watch
+
+  Examples: mkproj my_tool   mkproj ping_watch   mkproj agent2
 
   If your folder already exists and has an uppercase or mixed-case name
-  (e.g. ~/Projects/Ping-Watch), bypass the launcher and call bootstrap
+  (e.g. ~/Projects/PingWatch), bypass the launcher and call bootstrap
   directly from inside the folder -- it will use the folder name as-is:
 
-    cd ~/Projects/Ping-Watch
+    cd ~/Projects/PingWatch
     bash ~/Projects/project-bootstrap/bootstrap.sh
 
 INTERACTIVE PROMPTS
@@ -108,16 +113,27 @@ fi
 # ─── Name validation ──────────────────────────────────────────────────────────
 validate_name() {
     local name="$1"
-    if [[ ! "$name" =~ ^[a-z0-9_-]+$ ]]; then
+    if [[ "$name" =~ - ]]; then
         err "Invalid project name: '$name'"
         err ""
-        err "Allowed characters: a-z  0-9  _  -  (lowercase only)"
-        err "No spaces, uppercase letters, or special characters."
+        err "Hyphens are not allowed. The project name becomes a Python package"
+        err "directory (src/<name>/__init__.py), and hyphens are not valid in"
+        err "Python identifiers. Use an underscore instead."
+        err ""
+        err "  mkproj blah_foo   <- valid"
+        err "  mkproj blah-foo   <- not valid"
+        exit 1
+    fi
+    if [[ ! "$name" =~ ^[a-z][a-z0-9_]*$ ]]; then
+        err "Invalid project name: '$name'"
+        err ""
+        err "Allowed characters: a-z  0-9  _  (lowercase, underscore only)"
+        err "Must start with a letter. No spaces, uppercase, hyphens, or special characters."
         err ""
         err "Valid examples:"
-        err "  mkproj my-tool"
         err "  mkproj cambium_temp"
         err "  mkproj agent2024"
+        err "  mkproj my_tool"
         exit 1
     fi
 }
@@ -138,9 +154,6 @@ if [[ "$TEST_MODE" != "true" ]]; then
         validate_name "$PROJECT_NAME"
     fi
 fi
-
-# Python package name: hyphens are not valid identifiers
-MODULE_NAME="${PROJECT_NAME//-/_}"
 
 # ─── Screen ───────────────────────────────────────────────────────────────────
 if [[ -z "${STY:-}" ]]; then
@@ -229,7 +242,7 @@ phase1_preflight() {
     log "  Python  : .venv + requirements.txt stub"
     log "  Files   : CLAUDE.md  README.md  .gitignore  .env.example  run.sh  test.sh"
     log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
-    log "  Dirs    : src/$MODULE_NAME/  tests/  docs/  tasks/  responses/"
+    log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
     log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
     echo ""
 
@@ -478,12 +491,12 @@ phase6_structure() {
     log "=== Phase 6: Project structure ==="
 
     # src/<module>/ and tests/
-    if [[ ! -d "$PROJECT_DIR/src/$MODULE_NAME" ]]; then
-        mkdir -p "$PROJECT_DIR/src/$MODULE_NAME"
-        touch "$PROJECT_DIR/src/$MODULE_NAME/__init__.py"
-        log "  created src/$MODULE_NAME/"
+    if [[ ! -d "$PROJECT_DIR/src/$PROJECT_NAME" ]]; then
+        mkdir -p "$PROJECT_DIR/src/$PROJECT_NAME"
+        touch "$PROJECT_DIR/src/$PROJECT_NAME/__init__.py"
+        log "  created src/$PROJECT_NAME/"
     else
-        log "  src/$MODULE_NAME/ exists — skipping"
+        log "  src/$PROJECT_NAME/ exists — skipping"
     fi
     if [[ ! -d "$PROJECT_DIR/tests" ]]; then
         mkdir -p "$PROJECT_DIR/tests"
@@ -730,7 +743,7 @@ phase9_test_validate() {
     check ".env.example"        "$PROJECT_DIR/.env.example"
 
     # Directories
-    check "src/$MODULE_NAME/"   "$PROJECT_DIR/src/$MODULE_NAME"  d
+    check "src/$PROJECT_NAME/"   "$PROJECT_DIR/src/$PROJECT_NAME"  d
     check "tests/"              "$PROJECT_DIR/tests"             d
     check "docs/"               "$PROJECT_DIR/docs"              d
     check "tasks/"              "$PROJECT_DIR/tasks"             d
