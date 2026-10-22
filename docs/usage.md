@@ -7,7 +7,7 @@ cd ~/Projects
 mkproj myproject
 ```
 
-`mkproj` accepts the project name as an argument and creates the directory if it does not exist. Name rules: lowercase letters, digits, hyphens, underscores only (`my-tool`, `agent2`, `cambium_temp`).
+`mkproj` accepts the project name as an argument and creates the directory if it does not exist. Name rules: lowercase letters, digits, underscores only; must start with a letter (`my_tool`, `agent2`, `cambium_temp`). Hyphens are rejected because the project name becomes the Python package directory (`src/<name>/`), and hyphens are not valid Python identifiers.
 
 What happens next:
 1. A `screen` session named `myproject` is created
