@@ -781,6 +781,34 @@ phase9_test_validate() {
         pass=false
     fi
 
+    # Name validation
+    test_name() {
+        local name="$1" expect="$2"
+        if ( validate_name "$name" 2>/dev/null ); then
+            local result="valid"
+        else
+            local result="invalid"
+        fi
+        if [[ "$result" == "$expect" ]]; then
+            log "  PASS  name '$name' -> $result"
+        else
+            err "  FAIL  name '$name' expected $expect, got $result"
+            pass=false
+        fi
+    }
+    test_name "my_tool"      valid
+    test_name "agent2024"    valid
+    test_name "a"            valid
+    test_name "abc_123"      valid
+    test_name "my-tool"      invalid
+    test_name "MyTool"       invalid
+    test_name "UPPER"        invalid
+    test_name "2bad"         invalid
+    test_name "_bad"         invalid
+    test_name "bad name"     invalid
+    test_name "bad@name"     invalid
+    test_name "bad.name"     invalid
+
     echo ""
     if [[ "$pass" == "true" ]]; then
         log "All checks passed. Bootstrap is working correctly."
