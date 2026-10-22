@@ -139,6 +139,9 @@ if [[ "$TEST_MODE" != "true" ]]; then
     fi
 fi
 
+# Python package name: hyphens are not valid identifiers
+MODULE_NAME="${PROJECT_NAME//-/_}"
+
 # ─── Screen ───────────────────────────────────────────────────────────────────
 if [[ -z "${STY:-}" ]]; then
     log "Starting screen session: $PROJECT_NAME"
@@ -226,7 +229,7 @@ phase1_preflight() {
     log "  Python  : .venv + requirements.txt stub"
     log "  Files   : CLAUDE.md  README.md  .gitignore  .env.example  run.sh  test.sh"
     log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
-    log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
+    log "  Dirs    : src/$MODULE_NAME/  tests/  docs/  tasks/  responses/"
     log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
     echo ""
 
@@ -474,13 +477,13 @@ EOF
 phase6_structure() {
     log "=== Phase 6: Project structure ==="
 
-    # src/<name>/ and tests/
-    if [[ ! -d "$PROJECT_DIR/src/$PROJECT_NAME" ]]; then
-        mkdir -p "$PROJECT_DIR/src/$PROJECT_NAME"
-        touch "$PROJECT_DIR/src/$PROJECT_NAME/__init__.py"
-        log "  created src/$PROJECT_NAME/"
+    # src/<module>/ and tests/
+    if [[ ! -d "$PROJECT_DIR/src/$MODULE_NAME" ]]; then
+        mkdir -p "$PROJECT_DIR/src/$MODULE_NAME"
+        touch "$PROJECT_DIR/src/$MODULE_NAME/__init__.py"
+        log "  created src/$MODULE_NAME/"
     else
-        log "  src/$PROJECT_NAME/ exists — skipping"
+        log "  src/$MODULE_NAME/ exists — skipping"
     fi
     if [[ ! -d "$PROJECT_DIR/tests" ]]; then
         mkdir -p "$PROJECT_DIR/tests"
@@ -727,7 +730,7 @@ phase9_test_validate() {
     check ".env.example"        "$PROJECT_DIR/.env.example"
 
     # Directories
-    check "src/$PROJECT_NAME/"  "$PROJECT_DIR/src/$PROJECT_NAME" d
+    check "src/$MODULE_NAME/"   "$PROJECT_DIR/src/$MODULE_NAME"  d
     check "tests/"              "$PROJECT_DIR/tests"             d
     check "docs/"               "$PROJECT_DIR/docs"              d
     check "tasks/"              "$PROJECT_DIR/tasks"             d
