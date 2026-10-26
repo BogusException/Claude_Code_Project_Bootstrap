@@ -7,14 +7,16 @@ cd ~/Projects
 mkproj myproject
 ```
 
-`mkproj` accepts the project name as an argument and creates the directory if it does not exist.
+mkproj accepts zero or one argument. Extra arguments, unknown options, and an explicitly empty name fail before filesystem changes. New directories are created only after preflight confirmations.
 
 ### Name rules
 
 Applies to the project directory name only. Parent directories in the path are not checked -- `/home/pat/my-projects/my_tool` is fine; only `my_tool` is validated.
 
 - Allowed characters: `a-z`, `0-9`, `_`
+- Length: 1-64 ASCII characters; the full project path is limited to 2048 bytes
 - Must start with a lowercase letter
+- Python reserved keywords are rejected
 - Rejected: hyphens, uppercase letters, spaces, any other character
 
 Hyphens are rejected specifically because the project name becomes the Python package directory (`src/<name>/__init__.py`), and hyphens are not valid Python identifiers. Use an underscore instead: `my_tool` not `my-tool`.
@@ -31,6 +33,23 @@ What happens next:
 4. All 9 bootstrap phases run inside the screen session
 5. Three prompts after phases complete: bypass permissions? model? effort?
 6. Claude Code launches automatically in the new project directory
+
+### Interactive input limits
+
+All six prompt answers accept one ASCII character. Confirmation prompts accept
+y/n (uppercase Y/N also work). Model choices accept 1-8; effort choices accept
+1-4. Enter selects the displayed default. Whitespace, words, control characters,
+out-of-range numbers, and overlong entries are rejected and reprompted. Rejected
+lines are drained in bounded chunks; they are never truncated into valid answers.
+EOF aborts instead of accepting a default.
+
+The 64-character name and 2048-byte path limits are application policy, not
+operating-system maxima. Names are checked in the C locale. Parent paths may
+contain spaces, apostrophes, or Unicode; control characters are rejected.
+
+Run bash tests/test-input.sh for negative, boundary, and no-side-effect checks.
+The suite does not create repos, install packages, change global configuration,
+or launch Claude.
 
 ## 2. Bootstrapping an existing empty directory
 
@@ -93,8 +112,7 @@ myproject/
 │   └── settings.json   ← permissions + full hook wiring
 ├── .venv/              ← Python virtual environment
 ├── docs/               ← 8 stub docs (fill in as the project evolves)
-├── responses/          ← one .txt file per Claude exchange (gitignored content)
-│   └── .gitkeep
+├── responses/          ← private exchanges and attachments (entirely gitignored)
 ├── tasks/
 │   ├── todo.md         ← project task list
 │   └── skills-manifest.md ← auto-updated by auto-import-skill
