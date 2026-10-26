@@ -31,8 +31,10 @@ logs/
 *.sqlite3
 
 # Claude Code responses (never commit content)
-responses/*
-!responses/.gitkeep
+responses/
+
+# Private filesystem backups at any depth
+**/backups/
 
 # OS
 .DS_Store
