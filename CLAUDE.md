@@ -91,3 +91,25 @@ projSetup.md          ← original spec (reference only)
 - To change bootstrap behaviour: edit `bootstrap.sh` phase functions.
 - To add a new phase: add a `phaseN_name()` function and call it in `main()`.
 - After any change here, the next `proj` run picks it up automatically.
+
+## Linux reliability and Codex behavior
+
+This repository targets Linux only. Windows compatibility is deferred.
+AGENTS.md points here; keep shared behavior in this file.
+Back up existing configuration and directive files in adjacent backups/ folders
+with timestamped names and verify each copy before editing. Git is not a backup.
+Use this project's .venv interpreter for Python tooling.
+Everything under responses/ and backups/ is private and must stay out of Git.
+The Stop auto-commit hook only commits already-staged files and reports failures;
+stage specific task-owned files explicitly. Native Git hooks reject private paths.
+For Codex, save the current exact query and final response directly to a new
+responses/YYYYMMDD-HHMMSS.txt before delivery, read it back, and update/read
+responses/.last-saved. End the final response with its absolute archive path.
+Claude-specific hooks do not run automatically in Codex.
+Do not change Claude Code status settings while configuring Codex.
+
+## Command execution
+
+Never print the process environment or enable shell tracing while sourcing user
+configuration. From a different host shell, pass remote programs structured
+arguments through subprocess APIs rather than mixing nested shell quote rules.

@@ -104,3 +104,17 @@ a previously activated environment from another directory.
 
 The checkmark and archive path indicate compliance with these instructions.
 They do not prove complete context retention or answer correctness.
+
+## Git guard and launch behavior
+
+Native pre-commit and pre-push hooks reject private paths independently of agent
+tooling. Do not bypass them. The auto-commit Stop hook never stages files; it
+commits only explicitly staged changes and reports commit/push failures.
+Global shell/hook configuration is opt-in during bootstrap. Choose Claude,
+Codex, or no launch; each agent keeps its own model/status settings.
+
+## Command execution
+
+Never print the process environment or enable shell tracing while sourcing user
+configuration. From a different host shell, pass remote programs structured
+arguments through subprocess APIs rather than mixing nested shell quote rules.

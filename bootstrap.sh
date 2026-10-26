@@ -16,121 +16,71 @@ warn() { printf "${YELLOW}[bootstrap]${NC} %s\n" "$*"; }
 err()  { printf "${RED}[bootstrap]${NC} %s\n" "$*" >&2; }
 
 source "$BOOTSTRAP_DIR/lib/input.sh"
-validate_cli_args "$@"
-
-# ─── Help ─────────────────────────────────────────────────────────────────────
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || "${1:-}" == "--usage" ]]; then
+source "$BOOTSTRAP_DIR/lib/runtime.sh"
+CREATED_FILES=()
+TEST_ROOT=""
+TEST_PARENT=""
+CURRENT_PHASE=initialize
+usage() {
     cat <<'EOF'
+mkproj: Linux Python projects with shared Claude Code / Codex directives
 
-project-bootstrap — scaffold a complete Claude Code Python project
+Usage:
+  mkproj [--no-global] [--agent=claude|codex|none] [name]
+  mkproj --dry-run [--no-global] [--agent=claude|codex|none] [name]
+  mkproj --doctor [name]       read-only environment and privacy diagnostics
+  mkproj --test                isolated scaffold + negative tests; no global edits/pushes
+  mkproj --help
 
-USAGE
-  cd ~/Projects
-  mkproj <name>          create ~/Projects/<name> and bootstrap it
-  mkproj                 bootstrap the current directory (uses folder name)
-  mkproj --test          dry run in /tmp -- all 9 phases, validate, clean up
-  mkproj --help          show this message
-
-NAME RULES
-  Length  : 1-64 ASCII characters; full project path at most 2048 bytes
-  Allowed : a-z  0-9  _  (lowercase, underscore only; must start with a letter)
-  Rejected: hyphens, spaces, uppercase, special characters, Python keywords
-
-  Hyphens are rejected because the project name becomes the Python package
-  directory (src/<name>/__init__.py). Hyphens are not valid Python identifiers.
-  Use an underscore: mkproj ping_watch  not  mkproj ping-watch
-
-  Examples: mkproj my_tool   mkproj ping_watch   mkproj agent2
-
-  The same validation applies to named and current-directory projects.
-  Directly calling bootstrap.sh does not bypass these limits.
-  Every interactive answer is one character; Enter uses the shown default.
-  Invalid or overlong answers reprompt; EOF aborts.
-
-INTERACTIVE PROMPTS
-  Before the 9 phases run:
-  1. Confirm path?         -- [Y/n]  project name + full path; No exits immediately, no changes
-  2. Local bare repo?      -- [Y/n]  creates ~/Repositories/<name>.git; default Yes
-  3. Summary + Proceed?    -- [Y/n]  shows everything that will be created; default Yes
-
-  After the 9 phases complete:
-  4. Bypass permissions?   -- [Y/n]  adds --dangerously-skip-permissions to claude; default Yes
-  5. Model choice          -- [1-8]  haiku → best; default 2 = sonnet
-  6. Effort choice         -- [1-4]  low → max; default 2 = medium
-
-  Claude launches automatically after prompt 6.
-
-WHAT IT DOES (9 phases)
-  1. Preflight      -- safety checks; refuses live projects (>1 commit)
-  2. Git            -- git init on branch main; optionally creates a local
-                       bare repo in ~/Repositories/<name>.git and wires remote
-  3. Python         -- creates .venv, runs pip install (stub, fast)
-  4. Root files     -- copies templates: README, .gitignore, .env.example, etc.
-  5. Claude config  -- .claude/settings.json, hooks (from templates/), 4 rules (from templates/)
-  6. Structure      -- src/<name>/, tests/, docs/, tasks/, responses/
-  7. Global setup   -- auto-venv cd override in ~/.bashrc (idempotent)
-  8. Initial commit -- "Initial project scaffold" committed locally;
-                       pushed to remote if one was configured in phase 2
-  9. Verify + launch -- hooks checked; .env.example copied to .env; claude launched
-
-RE-RUNNING
-  Safe to re-run any time. Every phase checks before creating -- existing
-  files, dirs, and the venv are skipped. Only missing pieces are filled in.
-  Use this to recover from interrupted runs or to add the bare repo later:
-
-    cd ~/Projects/myproject
-    mkproj
-
---test MODE
-  Runs all 9 phases against a temp directory (/tmp/mkproj-test-<PID>).
-  All prompts are auto-answered. No screen session is started, so all output
-  is visible directly. After phase 9, a validation pass checks every expected
-  file, hook, and directory. Prints PASS or FAIL with details. Cleans up on
-  exit. Intended to be run from inside Claude Code so errors are visible and
-  fixable without leaving the session.
-
-PREREQUISITES
-  ~/bin/mkproj must exist (run: bash ~/Projects/project-bootstrap/install.sh)
-  ~/bin must be on PATH (ahead of /usr/bin to avoid conflicts)
-
-REMOTES (git)
-  Bootstrap does not force a remote. The very first prompt asks whether to
-  create a local bare repo in ~/Repositories/. You can skip it and add any
-  remote later -- see docs/adding-remotes.md for step-by-step instructions
-  covering local bare repos, GitHub, SourceForge, and dual-push.
-
+Names: 1-64 ASCII characters, starting a-z, followed by a-z, 0-9, underscore.
+Python keywords are refused. Full project paths are limited to 2048 bytes.
+Prompt answers are one character; invalid answers reprompt and EOF aborts.
+Existing repositories, remotes, user files, and configuration are preserved.
+Bare destination collisions abort; no overwrite or destructive collision option exists.
+Global shell/hook changes are opt-in and receive verified timestamped backups.
+New projects get CLAUDE.md plus an AGENTS.md pointer and native private-path guards.
+A project venv is verified before dependency installation and commits.
+Status settings are never configured by mkproj.
 EOF
-    exit 0
-fi
-
-# ─── Test mode ────────────────────────────────────────────────────────────────
-if [[ "${1:-}" == "--test" ]]; then
-    TEST_MODE=true
-    PROJECT_NAME="mkproj_test_$$"
-    PROJECT_DIR="/tmp/$PROJECT_NAME"
-    export STY="mkproj-test"   # suppress screen re-launch
-fi
-
-# ─── Project directory ────────────────────────────────────────────────────────
-if [[ "$TEST_MODE" != "true" ]]; then
-    if [[ -n "${1:-}" ]]; then
-        validate_name "$1"
-        PROJECT_NAME="$1"
+}
+cleanup_test() {
+    [[ -n "$TEST_ROOT" && -d "$TEST_ROOT" && ! -L "$TEST_ROOT" &&
+       "$TEST_ROOT" == "$TEST_PARENT"/mkproj-test.* ]] || return 0
+    rm -rf -- "$TEST_ROOT"
+}
+initialize() {
+    parse_args "$@"
+    CONFIGURE_GLOBAL=false
+    if [[ "$MODE" == help ]]; then return 0; fi
+    if [[ "$MODE" == test ]]; then
+        TEST_MODE=true
+        unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
+        export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+        export GIT_AUTHOR_NAME="Bootstrap test" GIT_AUTHOR_EMAIL="test@example.invalid"
+        export GIT_COMMITTER_NAME="Bootstrap test" GIT_COMMITTER_EMAIL="test@example.invalid"
+        TEST_PARENT="$(realpath "${TMPDIR:-/tmp}")"
+        TEST_ROOT="$(mktemp -d "$TEST_PARENT/mkproj-test.XXXXXXXX")"
+        PROJECT_NAME=mkproj_test
+        PROJECT_DIR="$TEST_ROOT/$PROJECT_NAME"
+        BARE_REPO="$TEST_ROOT/repositories/$PROJECT_NAME.git"
+        SETUP_LOCAL_REPO=true
+        LAUNCH_AGENT=none
+        NO_GLOBAL=true
+        trap cleanup_test EXIT
+    elif [[ "$HAS_PROJECT_ARG" == true ]]; then
+        PROJECT_NAME="$PROJECT_ARG"
         PROJECT_DIR="$PWD/$PROJECT_NAME"
     else
         PROJECT_DIR="$PWD"
         PROJECT_NAME="$(basename "$PROJECT_DIR")"
-        validate_name "$PROJECT_NAME"
+        if [[ "$MODE" != doctor ]]; then validate_name "$PROJECT_NAME"; fi
     fi
-fi
-
-validate_project_path "$PROJECT_DIR"
-
-# ─── Screen ───────────────────────────────────────────────────────────────────
-if [[ -z "${STY:-}" ]]; then
-    log "Starting screen session: $PROJECT_NAME"
-    exec screen -S "$PROJECT_NAME" bash -c '"$1" "${@:2}"; exec bash' bash "$BOOTSTRAP_DIR/bootstrap.sh" "$@"
-fi
+    validate_project_path "$PROJECT_DIR"
+    if [[ "$MODE" == setup && "$LAUNCH_AGENT" != none && -z "${STY:-}" ]]; then
+        command -v screen >/dev/null || { err "screen is required for an interactive launch."; return 1; }
+        exec screen -S "$PROJECT_NAME" bash -c '"$1" "${@:2}"; status=$?; (( status == 0 )) || exit "$status"; exec bash' bash "$BOOTSTRAP_DIR/bootstrap.sh" "$@"
+    fi
+}
 
 # ─── Phase 1: Preflight ───────────────────────────────────────────────────────
 phase1_preflight() {
@@ -151,46 +101,14 @@ phase1_preflight() {
         echo ""
     fi
 
-    # Prerequisites
-    local missing=()
-    if ! python3 --version 2>/dev/null | grep -qE "3\.(1[2-9]|[2-9][0-9])"; then
-        missing+=("Python 3.12+")
+    check_prerequisites
+    if [[ "$TEST_MODE" != true && ( -n "${GIT_DIR:-}" || -n "${GIT_WORK_TREE:-}" || -n "${GIT_INDEX_FILE:-}" ) ]]; then
+        err "Unset Git path override variables before bootstrapping."; return 1
     fi
-    command -v git &>/dev/null || missing+=("git")
-    command -v jq  &>/dev/null || missing+=("jq")
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        err "Missing prerequisites: ${missing[*]}"
-        exit 1
-    fi
-
-    # Detect project work already in progress — always a mistake to run bootstrap then.
-    # Exception: scaffold commit + auto-commits are recoverable (bootstrap was interrupted
-    # and Claude ran in the project before it was fully set up).
-    if git -C "$PROJECT_DIR" rev-parse --git-dir &>/dev/null 2>&1; then
-        local count
-        count=$(git -C "$PROJECT_DIR" rev-list --count HEAD 2>/dev/null || echo 0)
-        if [[ "$count" -gt 0 ]]; then
-            # Check whether every commit is a scaffold or auto-commit message
-            local non_bootstrap
-            non_bootstrap=$(git -C "$PROJECT_DIR" log --format="%s" \
-                | grep -cv "^Initial project scaffold$\|^auto-commit: " || true)
-            if [[ "$non_bootstrap" -gt 0 ]]; then
-                err "STOP: $PROJECT_NAME has real project commits — cannot re-bootstrap."
-                err "Recent commits:"
-                git -C "$PROJECT_DIR" log --oneline -5 >&2
-                err ""
-                err "bootstrap is for initial setup only. Running it now would be a mistake."
-                exit 1
-            fi
-            warn "Found $count scaffold/auto-commit(s) — recovering from incomplete bootstrap."
-            warn "Continuing idempotently."
-        fi
-    fi
-
-    if [[ "$TEST_MODE" == "true" ]]; then
-        SETUP_LOCAL_REPO=true
-        BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
-        return
+    check_project_repo
+    if [[ "$TEST_MODE" == true ]]; then
+        check_repo_destination
+        return 0
     fi
 
     # Ask about bare repo next, so the summary can reflect the choice
@@ -198,7 +116,22 @@ phase1_preflight() {
     read_choice local_repo_ans "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " y yYnN
     if [[ "${local_repo_ans,,}" != "n" ]]; then
         SETUP_LOCAL_REPO=true
-        BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
+        BARE_REPO="$(realpath -m -- "${MKPROJ_REPOSITORIES_DIR:-$HOME/Repositories}/$PROJECT_NAME.git")"
+    fi
+
+    check_repo_destination
+    if [[ "$LAUNCH_AGENT" == ask ]]; then
+        local agent_choice
+        read_choice agent_choice "Launch 1) Claude 2) Codex 3) none [1]: " 1 123
+        case "$agent_choice" in 1) LAUNCH_AGENT=claude;; 2) LAUNCH_AGENT=codex;; 3) LAUNCH_AGENT=none;; esac
+    fi
+    if [[ "$LAUNCH_AGENT" != none ]]; then
+        command -v "$LAUNCH_AGENT" >/dev/null || { err "Selected agent is not installed: $LAUNCH_AGENT"; return 1; }
+    fi
+    if [[ "$NO_GLOBAL" == false ]]; then
+        local global_choice
+        read_choice global_choice "Configure global shell/hooks? [y/N]: " n yYnN
+        [[ "$global_choice" != y ]] || CONFIGURE_GLOBAL=true
     fi
 
     # Summary of what will be created
@@ -216,7 +149,8 @@ phase1_preflight() {
     log "  Files   : CLAUDE.md  AGENTS.md  README.md  .gitignore  .env.example  run.sh  test.sh"
     log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
     log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
-    log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
+    log "  Global  : $CONFIGURE_GLOBAL (verified configuration backups before edits)"
+    log "  Launch  : $LAUNCH_AGENT"
     echo ""
 
     local confirm
@@ -238,16 +172,13 @@ phase2_git() {
     fi
 
     if [[ "$SETUP_LOCAL_REPO" == "true" ]]; then
-        mkdir -p "$HOME/Repositories"
-        if [[ ! -d "$BARE_REPO" ]]; then
+        mkdir -p -- "$(dirname "$BARE_REPO")"
+        if [[ ! -e "$BARE_REPO" ]]; then
             git init --bare -q "$BARE_REPO"
             log "  Created bare repo: $BARE_REPO"
-        else
-            log "  Bare repo exists — skipping init"
         fi
-        if git -C "$PROJECT_DIR" remote get-url origin &>/dev/null 2>&1; then
-            git -C "$PROJECT_DIR" remote set-url origin "$BARE_REPO"
-        else
+        if ! git -C "$PROJECT_DIR" remote get-url origin >/dev/null 2>&1; then
+            backup_config "$(git -C "$PROJECT_DIR" rev-parse --absolute-git-dir)/config"
             git -C "$PROJECT_DIR" remote add origin "$BARE_REPO"
         fi
         log "  Remote origin → $BARE_REPO"
@@ -269,6 +200,7 @@ phase3_python() {
 
     if [[ ! -f "$PROJECT_DIR/requirements.txt" ]]; then
         cp "$TEMPLATES_DIR/requirements.txt" "$PROJECT_DIR/requirements.txt"
+        CREATED_FILES+=(requirements.txt)
         log "  Created requirements.txt"
     else
         log "  requirements.txt exists — skipping"
@@ -284,6 +216,7 @@ copy_template() {
     fi
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
+    CREATED_FILES+=("$2")
     log "  created — $2"
 }
 
@@ -298,6 +231,7 @@ phase4_root_files() {
         local dst="$PROJECT_DIR/$f"
         if [[ ! -f "$dst" ]]; then
             sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATES_DIR/$f" > "$dst"
+            CREATED_FILES+=("$f")
             log "  created — $f"
         else
             log "  exists — $f"
@@ -316,6 +250,7 @@ phase5_claude_config() {
     # Disable branch protection by default (single-developer workflow)
     if [[ ! -f "$PROJECT_DIR/.claude/protected-branches" ]]; then
         touch "$PROJECT_DIR/.claude/protected-branches"
+        CREATED_FILES+=(.claude/protected-branches)
         log "  created .claude/protected-branches (branch protection disabled)"
     fi
 
@@ -327,6 +262,7 @@ phase5_claude_config() {
         if [[ ! -f "$dst" ]]; then
             cp "$hook" "$dst"
             chmod +x "$dst"
+            CREATED_FILES+=(".claude/hooks/$name")
             log "  hook: $name"
             ((hook_count++)) || true
         fi
@@ -340,6 +276,7 @@ phase5_claude_config() {
         local dst="$PROJECT_DIR/.claude/rules/$name"
         if [[ ! -f "$dst" ]]; then
             cp "$rule" "$dst"
+            CREATED_FILES+=(".claude/rules/$name")
             log "  rule: $name"
             ((rule_count++)) || true
         fi
@@ -349,6 +286,7 @@ phase5_claude_config() {
     # settings.json
     if [[ ! -f "$PROJECT_DIR/.claude/settings.json" ]]; then
         generate_settings_json > "$PROJECT_DIR/.claude/settings.json"
+        CREATED_FILES+=(.claude/settings.json)
         log "  generated settings.json"
     else
         log "  settings.json exists — skipping"
@@ -463,6 +401,7 @@ phase6_structure() {
     if [[ ! -d "$PROJECT_DIR/src/$PROJECT_NAME" ]]; then
         mkdir -p "$PROJECT_DIR/src/$PROJECT_NAME"
         touch "$PROJECT_DIR/src/$PROJECT_NAME/__init__.py"
+        CREATED_FILES+=("src/$PROJECT_NAME/__init__.py")
         log "  created src/$PROJECT_NAME/"
     else
         log "  src/$PROJECT_NAME/ exists — skipping"
@@ -470,6 +409,7 @@ phase6_structure() {
     if [[ ! -d "$PROJECT_DIR/tests" ]]; then
         mkdir -p "$PROJECT_DIR/tests"
         touch "$PROJECT_DIR/tests/.gitkeep"
+        CREATED_FILES+=(tests/.gitkeep)
         log "  created tests/"
     else
         log "  tests/ exists — skipping"
@@ -491,6 +431,7 @@ phase6_structure() {
         if [[ ! -f "$dst" ]]; then
             cp "$TEMPLATES_DIR/$script" "$dst"
             chmod +x "$dst"
+            CREATED_FILES+=("$script")
             log "  created $script (executable)"
         else
             log "  exists — $script"
@@ -499,66 +440,50 @@ phase6_structure() {
 }
 
 # ─── Phase 7: Global setup (idempotent) ───────────────────────────────────────
-backup_config() {
-    local path="$1"
-    [[ -f "$path" ]] || return 0
-    local backup_dir backup
-    backup_dir="$(dirname "$path")/backups"
-    mkdir -p -m 700 -- "$backup_dir"
-    backup="$backup_dir/$(basename "$path").$(date +%Y%m%d-%H%M%S-%N).bak"
-    cp --preserve=all -- "$path" "$backup"
-    cmp -s -- "$path" "$backup"
-    log "  backup: $backup"
-}
-
 phase7_global() {
-    log "=== Phase 7: Global setup ==="
-
-    # auto-import-skill.sh global hook
-    local global_hook="$HOME/.claude/hooks/auto-import-skill.sh"
-    if [[ ! -f "$global_hook" ]]; then
-        mkdir -p "$(dirname "$global_hook")"
-        cp "$TEMPLATES_DIR/hooks/auto-import-skill.sh" "$global_hook"
-        chmod +x "$global_hook"
-        log "  installed ~/.claude/hooks/auto-import-skill.sh"
-    else
-        log "  auto-import-skill.sh already installed"
+    if [[ "$TEST_MODE" == true || "$CONFIGURE_GLOBAL" != true ]]; then
+        log "Global setup skipped."
+        return 0
     fi
-
-    # Global settings.json — wire PostToolUse/Skill if missing
-    local global_settings="$HOME/.claude/settings.json"
-    if [[ -f "$global_settings" ]]; then
-        if ! jq -e '.hooks.PostToolUse[]? | select(.matcher == "Skill") | .hooks[]? | select(.command | contains("auto-import-skill"))' \
-                "$global_settings" &>/dev/null 2>&1; then
-            backup_config "$global_settings"
-            local tmp; tmp="$(mktemp)"
-            jq '.hooks.PostToolUse += [{"matcher":"Skill","hooks":[{"type":"command","command":"~/.claude/hooks/auto-import-skill.sh","timeout":15,"statusMessage":"Checking skill locality..."}]}]' \
-                "$global_settings" > "$tmp"
-            cat "$tmp" > "$global_settings"
-            rm -- "$tmp"
-            log "  wired auto-import-skill in global settings.json"
-        else
-            log "  global auto-import-skill already wired"
+    local global_root="${1:-$HOME}"
+    local global_hook="$global_root/.claude/hooks/auto-import-skill.sh"
+    local settings="$global_root/.claude/settings.json" bashrc="$global_root/.bashrc" content
+    if [[ -f "$settings" ]]; then
+        jq empty "$settings"
+        if ! jq -e '.hooks.PostToolUse[]? | select(.matcher == "Skill") | .hooks[]? | select(.command | contains("auto-import-skill"))' "$settings" >/dev/null; then
+            content="$(jq '.hooks.PostToolUse += [{"matcher":"Skill","hooks":[{"type":"command","command":"~/.claude/hooks/auto-import-skill.sh","timeout":15,"statusMessage":"Checking skill locality..."}]}]' "$settings")"
+            replace_config "$settings" "$content"$'\n'
         fi
-    else
-        warn "  ~/.claude/settings.json not found — skipping global hook wiring"
     fi
-
-    # ~/.bashrc: CLAUDE_PROTECTED_BRANCHES
-    local bashrc="$HOME/.bashrc"
+    if [[ ! -e "$global_hook" ]]; then
+        mkdir -p -- "$(dirname "$global_hook")"
+        cp "$TEMPLATES_DIR/hooks/auto-import-skill.sh" "$global_hook"
+        chmod u+x "$global_hook"
+    fi
+    content=""
+    [[ ! -f "$bashrc" ]] || content="$(cat "$bashrc")"
+    local changed=false
     if ! grep -q "CLAUDE_PROTECTED_BRANCHES" "$bashrc" 2>/dev/null; then
-        backup_config "$bashrc"
-        printf '\nexport CLAUDE_PROTECTED_BRANCHES=""\n' >> "$bashrc"
-        log "  added CLAUDE_PROTECTED_BRANCHES to ~/.bashrc"
-    else
-        log "  CLAUDE_PROTECTED_BRANCHES already in ~/.bashrc"
+        content+=$'\nexport CLAUDE_PROTECTED_BRANCHES=""\n'
+        changed=true
     fi
-
-    # ~/.bashrc: auto-venv cd override
-    if ! grep -q "auto-venv cd override" "$bashrc" 2>/dev/null; then
-        backup_config "$bashrc"
-        cat >> "$bashrc" <<'BASHRC'
-
+    local auto_venv legacy_venv
+    auto_venv="$(cat <<'BASHRC'
+# auto-venv cd override
+cd() {
+    builtin cd "$@" || return
+    if [[ -n "${MKPROJ_AUTO_VENV:-}" && "${VIRTUAL_ENV:-}" == "$MKPROJ_AUTO_VENV" ]]; then
+        deactivate
+        unset MKPROJ_AUTO_VENV
+    fi
+    if [[ -f .venv/bin/activate && -z "${VIRTUAL_ENV:-}" ]]; then
+        source .venv/bin/activate || return
+        MKPROJ_AUTO_VENV="$VIRTUAL_ENV"
+    fi
+}
+BASHRC
+)"
+    legacy_venv="$(cat <<'BASHRC'
 # auto-venv cd override
 cd() {
     builtin cd "$@"
@@ -567,29 +492,36 @@ cd() {
     fi
 }
 BASHRC
-        log "  added auto-venv cd override to ~/.bashrc"
-    else
-        log "  auto-venv cd override already in ~/.bashrc"
+)"
+    if [[ "$content" == *"$legacy_venv"* ]]; then
+        content="${content/"$legacy_venv"/"$auto_venv"}"
+        changed=true
+    elif ! grep -q "auto-venv cd override" "$bashrc" 2>/dev/null; then
+        content+=$'\n'"$auto_venv"
+        changed=true
+    elif [[ "$content" != *MKPROJ_AUTO_VENV* ]]; then
+        warn "Custom auto-venv function retained; review its environment switching manually."
     fi
+    if [[ "$changed" == true ]]; then replace_config "$bashrc" "$content"$'\n'; fi
 }
 
 # ─── Phase 8: Initial commit ──────────────────────────────────────────────────
 phase8_commit() {
-    log "=== Phase 8: Initial commit ==="
-
-    if git -C "$PROJECT_DIR" rev-parse HEAD &>/dev/null 2>&1; then
-        log "  already committed — skipping"
-        return
+    local message="Initial project scaffold"
+    git -C "$PROJECT_DIR" diff --cached --quiet || {
+        err "Index contains staged user changes; nothing was automatically added."; return 1;
+    }
+    if (( ${#CREATED_FILES[@]} )); then
+        git -C "$PROJECT_DIR" add -- "${CREATED_FILES[@]}"
+        if ! git -C "$PROJECT_DIR" diff --cached --quiet; then
+            if git -C "$PROJECT_DIR" rev-parse HEAD >/dev/null 2>&1; then message="Complete project scaffold"; fi
+            git -C "$PROJECT_DIR" commit -m "$message"
+        fi
     fi
-
-    git -C "$PROJECT_DIR" add -A
-    git -C "$PROJECT_DIR" commit -q -m "Initial project scaffold"
-    log "  committed locally"
-    if git -C "$PROJECT_DIR" remote get-url origin &>/dev/null 2>&1; then
-        git -C "$PROJECT_DIR" push -u origin main -q
-        log "  pushed to $(git -C "$PROJECT_DIR" remote get-url origin)"
-    else
-        log "  no remote configured — skipping push (see docs/adding-remotes.md)"
+    if [[ "$TEST_MODE" == true ]]; then
+        log "Test mode: remote push skipped."
+    elif git -C "$PROJECT_DIR" remote get-url origin >/dev/null 2>&1; then
+        git -C "$PROJECT_DIR" push -u origin main
     fi
 }
 
@@ -597,34 +529,27 @@ phase8_commit() {
 phase9_verify() {
     log "=== Phase 9: Verify ==="
 
-    local ok=true
-
-    # All hooks must be executable — fix silently if not
-    while IFS= read -r -d '' hook; do
-        if [[ ! -x "$hook" ]]; then
-            chmod +x "$hook"
-            warn "  Fixed missing +x: $(basename "$hook")"
-        fi
-    done < <(find "$PROJECT_DIR/.claude/hooks" -type f -name "*.sh" -print0 2>/dev/null)
-    log "  All hooks executable"
-
-    echo ""
-    log "Bootstrap complete. $PROJECT_NAME is ready."
-
-    # Install dependencies (empty stub — runs fast; venv already created in phase 3)
-    echo ""
-    log "Installing dependencies..."
-    "$PROJECT_DIR/.venv/bin/pip" install -r "$PROJECT_DIR/requirements.txt" -q
-    log "  Done"
-
-    # Copy .env.example → .env so the project is ready for API keys
-    if [[ ! -f "$PROJECT_DIR/.env" ]]; then
-        cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-        log "  Copied .env.example → .env  (fill in any API keys before starting)"
-    else
-        log "  .env already exists — skipping copy"
+    local file
+    for file in CLAUDE.md AGENTS.md .gitignore .gitattributes .claude/settings.json; do
+        [[ -f "$PROJECT_DIR/$file" ]] || { err "Required file missing: $file"; return 1; }
+    done
+    jq empty "$PROJECT_DIR/.claude/settings.json"
+    verify_privacy_rules
+    [[ -x "$PROJECT_DIR/.venv/bin/python" ]] || { err "Project venv is not executable."; return 1; }
+    "$PROJECT_DIR/.venv/bin/python" -c 'import pathlib,sys; sys.exit(pathlib.Path(sys.prefix).resolve()!=pathlib.Path(sys.argv[1]).resolve())' "$PROJECT_DIR/.venv"
+    if [[ "$TEST_MODE" != true ]]; then
+        PIP_DISABLE_PIP_VERSION_CHECK=1 "$PROJECT_DIR/.venv/bin/python" -m pip install -r "$PROJECT_DIR/requirements.txt" -q
     fi
+    if [[ ! -e "$PROJECT_DIR/.env" ]]; then cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"; fi
+    log "Project verified."
+}
 
+launch_agent() {
+    if [[ "$LAUNCH_AGENT" == none || "$TEST_MODE" == true ]]; then return 0; fi
+    if [[ "$LAUNCH_AGENT" == codex ]]; then
+        cd -- "$PROJECT_DIR"
+        exec codex
+    fi
     # ── Claude Code launch options ────────────────────────────────────────────
     echo ""
     log "Configure Claude Code launch:"
@@ -807,32 +732,59 @@ phase9_test_validate() {
 
     echo ""
     log "Cleaning up test artifacts..."
-    rm -rf "$PROJECT_DIR"
-    log "  Removed $PROJECT_DIR"
+    log "Temporary artifacts will be removed by the test cleanup trap."
     [[ "$pass" == "true" ]]
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
-    echo ""
-    log "project-bootstrap — setting up '$PROJECT_NAME'"
-    log "Scaffolds a complete Claude Code Python project from scratch."
-    echo ""
-
+    CURRENT_PHASE=preflight
     phase1_preflight
+    local lock_dir lock_key
+    if [[ "$TEST_MODE" == true ]]; then lock_dir="$TEST_ROOT/locks"; else lock_dir="/tmp/mkproj-locks-$UID"; fi
+    [[ ! -L "$lock_dir" ]] || { err "Refusing symlinked lock directory."; return 1; }
+    (umask 077; mkdir -p -- "$lock_dir")
+    [[ -O "$lock_dir" ]] || { err "Lock directory belongs to another user."; return 1; }
+    chmod 700 "$lock_dir"
+    lock_key="$(printf '%s' "$PROJECT_DIR" | sha256sum | cut -d' ' -f1)"
+    exec {LOCK_FD}>"$lock_dir/$lock_key"
+    flock -n "$LOCK_FD" || { err "Another mkproj instance owns this project."; return 1; }
+    if [[ "$SETUP_LOCAL_REPO" == true ]]; then
+        lock_key="$(printf '%s' "bare:$BARE_REPO" | sha256sum | cut -d' ' -f1)"
+        exec {BARE_LOCK_FD}>"$lock_dir/$lock_key"
+        flock -n "$BARE_LOCK_FD" || { err "Another mkproj instance owns the bare destination."; return 1; }
+    fi
+    check_project_repo
+    check_repo_destination
     mkdir -p -- "$PROJECT_DIR"
-    phase2_git
-    phase3_python
-    phase4_root_files
-    phase5_claude_config
-    phase6_structure
-    phase7_global
-    phase8_commit
-    if [[ "$TEST_MODE" == "true" ]]; then
+    CURRENT_PHASE=git; phase2_git
+    CURRENT_PHASE=python; phase3_python
+    CURRENT_PHASE=files; phase4_root_files
+    CURRENT_PHASE=claude; phase5_claude_config
+    CURRENT_PHASE=structure; phase6_structure
+    CURRENT_PHASE=guards; configure_git_guards
+    CURRENT_PHASE=verify; phase9_verify
+    CURRENT_PHASE=global; phase7_global
+    CURRENT_PHASE=commit; phase8_commit
+    if [[ "$TEST_MODE" == true ]]; then
         phase9_test_validate
     else
-        phase9_verify
+        log "Bootstrap complete: $PROJECT_DIR"
+        flock -u "$LOCK_FD"
+        if [[ -n "${BARE_LOCK_FD:-}" ]]; then flock -u "$BARE_LOCK_FD"; fi
+        CURRENT_PHASE=launch
+        launch_agent
     fi
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    set -E
+    trap 'status=$?; err "mkproj failed in phase $CURRENT_PHASE (line $LINENO, exit $status). Existing project data and backups are retained."; exit "$status"' ERR
+    initialize "$@"
+    case "$MODE" in
+        help) usage ;;
+        doctor) doctor ;;
+        dry-run) dry_run ;;
+        *) main ;;
+    esac
+fi

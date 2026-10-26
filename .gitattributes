@@ -14,3 +14,7 @@
 *.db   binary
 *.sqlite binary
 *.pyc  binary
+
+*.sqlite3 binary
+*.so binary
+*.pyd binary

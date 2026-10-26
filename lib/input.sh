@@ -19,18 +19,42 @@ validate_name() {
     esac
 }
 
-validate_cli_args() {
-    if (( $# > 1 )); then
-        err "Expected zero or one argument: project name, --help, or --test."
-        return 1
+parse_args() {
+    MODE=setup
+    PROJECT_ARG=""
+    HAS_PROJECT_ARG=false
+    LAUNCH_AGENT=ask
+    NO_GLOBAL=false
+    local arg mode_seen=false agent_seen=false
+    (( $# <= 4 )) || { err "Too many arguments."; return 1; }
+    for arg in "$@"; do
+        case "$arg" in
+            --help|-h|--usage|--test|--doctor|--dry-run)
+                [[ "$mode_seen" == false ]] || { err "Choose one command mode."; return 1; }
+                mode_seen=true
+                case "$arg" in --help|-h|--usage) MODE=help;; --test) MODE=test;; --doctor) MODE=doctor;; --dry-run) MODE=dry-run;; esac ;;
+            --agent=claude|--agent=codex|--agent=none)
+                [[ "$agent_seen" == false ]] || { err "Duplicate agent option."; return 1; }
+                LAUNCH_AGENT="${arg#--agent=}"; agent_seen=true ;;
+            --no-global)
+                [[ "$NO_GLOBAL" == false ]] || { err "Duplicate --no-global."; return 1; }
+                NO_GLOBAL=true ;;
+            -*)
+                err "Unknown option. Use --help."; return 1 ;;
+            *)
+                [[ "$HAS_PROJECT_ARG" == false ]] || { err "Only one project name is allowed."; return 1; }
+                validate_name "$arg" || return
+                PROJECT_ARG="$arg"; HAS_PROJECT_ARG=true ;;
+        esac
+    done
+    if [[ "$MODE" == help || "$MODE" == test ]]; then
+        (( $# == 1 )) || { err "This mode takes no additional arguments."; return 1; }
     fi
-    (( $# == 0 )) && return 0
-    case "$1" in
-        --help|-h|--usage|--test) return 0 ;;
-        -*) err "Unknown option. Use --help for usage."; return 1 ;;
-        *) validate_name "$1" ;;
-    esac
+    if [[ "$MODE" == doctor && ( "$agent_seen" == true || "$NO_GLOBAL" == true ) ]]; then
+        err "--doctor takes only an optional project name."; return 1
+    fi
 }
+validate_cli_args() { parse_args "$@"; }
 
 validate_project_path() {
     local LC_ALL=C path="$1"
