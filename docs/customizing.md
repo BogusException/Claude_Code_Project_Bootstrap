@@ -49,14 +49,14 @@ echo "release" >> .claude/protected-branches
 
 The file is read at hook-run time, so changes take effect immediately without restarting Claude Code.
 
-## 5. Adding dotclaude marketplace hooks
+## 5. Maintaining bundled hooks
 
-No change needed. Bootstrap copies every `*.sh` it finds in the marketplace hooks directory, so new hooks added upstream are picked up automatically.
+All hook scripts are bundled in templates/hooks/. Update those files deliberately; bootstrap does not depend on an installed marketplace.
 
 ## 6. Adding custom hooks to all new projects
 
 1. Place the hook script in `templates/hooks/`
-2. Add it to the explicit copy loop in `phase5_claude_config()` in `bootstrap.sh`
+2. The existing wildcard copy loop in `phase5_claude_config()` in `bootstrap.sh`
 3. Add the corresponding entry to `generate_settings_json()` with the correct event type and matcher
 
 ## 7. Codex and shared project directives
@@ -82,3 +82,5 @@ are ignored at every depth. Before modifying existing global configuration,
 bootstrap creates a timestamped, verified copy beside it in backups/, preserving
 file metadata. These are local recovery copies; keep a separate backup against
 loss of the underlying storage.
+
+See reliability.md for native Git guards, read-only modes, staged-only auto-commit, and opt-in global setup.

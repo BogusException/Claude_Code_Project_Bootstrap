@@ -48,3 +48,15 @@ desktop.ini
 *.swo
 *~
 .cursor/
+
+# Agent-local state and credentials
+.claude/settings.local.json
+.codex/auth.json
+.codex/sessions/
+.codex/log/
+
+# Private keys and credential containers
+*.pem
+*.key
+*.p12
+*.pfx

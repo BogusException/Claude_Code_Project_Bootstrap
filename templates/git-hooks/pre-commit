@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/private-paths.sh"
+while IFS= read -r -d '' path; do
+    guard_path "$path" || exit 1
+done < <(git diff --cached --name-only --diff-filter=ACMRT -z)

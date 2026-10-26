@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/private-paths.sh"
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [[ "$local_sha" != 0000000000000000000000000000000000000000 ]] || continue
+    git rev-parse --verify "$local_sha^{commit}" >/dev/null || {
+        echo "Refusing a push whose history cannot be inspected." >&2; exit 1;
+    }
+    range=("$local_sha")
+    if [[ "$remote_sha" != 0000000000000000000000000000000000000000 ]] &&
+       git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        range+=("^$remote_sha")
+    else
+        range+=(--not --remotes)
+    fi
+    commits="$(git rev-list "${range[@]}")"
+    while IFS= read -r commit; do
+        [[ -n "$commit" ]] || continue
+        while IFS= read -r -d '' path; do
+            # Grandfather only empty historical response placeholders.
+            # New placeholders are rejected by pre-commit.
+            if [[ "$path" == responses/.gitkeep || "$path" == */responses/.gitkeep ]] &&
+               [[ "$(git cat-file -s "$commit:$path")" == 0 ]]; then
+                continue
+            fi
+            guard_path "$path" || exit 1
+        done < <(git diff-tree --root -m --no-commit-id --name-only --diff-filter=ACMRT -r -z "$commit")
+    done <<< "$commits"
+done

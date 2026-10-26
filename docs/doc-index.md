@@ -77,3 +77,5 @@ Section references use the format: `filename §N.N`
 **V**
 
 **Venv (Python virtual environment)** -- how-it-works.md §3 (phase 3 row)
+
+- Linux reliability, backups, native Git guards, and test isolation: reliability.md

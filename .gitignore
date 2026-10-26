@@ -1,11 +1,62 @@
+# Python
+.venv/
+venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+dist/
+build/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Environment & secrets
 .env
 .env.*
 !.env.example
-.claude/settings.local.json
-responses/*
-!responses/.gitkeep
+secrets/
+
+# Logs & runtime
+*.log
+logs/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Claude Code responses (never commit content)
+responses/
 
 # Private filesystem backups at any depth
 **/backups/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Agent-local state and credentials
+.claude/settings.local.json
+.codex/auth.json
+.codex/sessions/
+.codex/log/
+
+# Private keys and credential containers
+*.pem
+*.key
+*.p12
+*.pfx
