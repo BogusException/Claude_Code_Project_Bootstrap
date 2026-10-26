@@ -15,6 +15,9 @@ log()  { printf "${GREEN}[bootstrap]${NC} %s\n" "$*"; }
 warn() { printf "${YELLOW}[bootstrap]${NC} %s\n" "$*"; }
 err()  { printf "${RED}[bootstrap]${NC} %s\n" "$*" >&2; }
 
+source "$BOOTSTRAP_DIR/lib/input.sh"
+validate_cli_args "$@"
+
 # ─── Help ─────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || "${1:-}" == "--usage" ]]; then
     cat <<'EOF'
@@ -29,8 +32,9 @@ USAGE
   mkproj --help          show this message
 
 NAME RULES
+  Length  : 1-64 ASCII characters; full project path at most 2048 bytes
   Allowed : a-z  0-9  _  (lowercase, underscore only; must start with a letter)
-  Rejected: hyphens, spaces, uppercase, special characters
+  Rejected: hyphens, spaces, uppercase, special characters, Python keywords
 
   Hyphens are rejected because the project name becomes the Python package
   directory (src/<name>/__init__.py). Hyphens are not valid Python identifiers.
@@ -38,12 +42,10 @@ NAME RULES
 
   Examples: mkproj my_tool   mkproj ping_watch   mkproj agent2
 
-  If your folder already exists and has an uppercase or mixed-case name
-  (e.g. ~/Projects/PingWatch), bypass the launcher and call bootstrap
-  directly from inside the folder -- it will use the folder name as-is:
-
-    cd ~/Projects/PingWatch
-    bash ~/Projects/project-bootstrap/bootstrap.sh
+  The same validation applies to named and current-directory projects.
+  Directly calling bootstrap.sh does not bypass these limits.
+  Every interactive answer is one character; Enter uses the shown default.
+  Invalid or overlong answers reprompt; EOF aborts.
 
 INTERACTIVE PROMPTS
   Before the 9 phases run:
@@ -104,39 +106,10 @@ fi
 # ─── Test mode ────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--test" ]]; then
     TEST_MODE=true
-    PROJECT_NAME="mkproj-test-$$"
+    PROJECT_NAME="mkproj_test_$$"
     PROJECT_DIR="/tmp/$PROJECT_NAME"
-    mkdir -p "$PROJECT_DIR"
     export STY="mkproj-test"   # suppress screen re-launch
 fi
-
-# ─── Name validation ──────────────────────────────────────────────────────────
-validate_name() {
-    local name="$1"
-    if [[ "$name" =~ - ]]; then
-        err "Invalid project name: '$name'"
-        err ""
-        err "Hyphens are not allowed. The project name becomes a Python package"
-        err "directory (src/<name>/__init__.py), and hyphens are not valid in"
-        err "Python identifiers. Use an underscore instead."
-        err ""
-        err "  mkproj blah_foo   <- valid"
-        err "  mkproj blah-foo   <- not valid"
-        exit 1
-    fi
-    if [[ ! "$name" =~ ^[a-z][a-z0-9_]*$ ]]; then
-        err "Invalid project name: '$name'"
-        err ""
-        err "Allowed characters: a-z  0-9  _  (lowercase, underscore only)"
-        err "Must start with a letter. No spaces, uppercase, hyphens, or special characters."
-        err ""
-        err "Valid examples:"
-        err "  mkproj cambium_temp"
-        err "  mkproj agent2024"
-        err "  mkproj my_tool"
-        exit 1
-    fi
-}
 
 # ─── Project directory ────────────────────────────────────────────────────────
 if [[ "$TEST_MODE" != "true" ]]; then
@@ -144,10 +117,6 @@ if [[ "$TEST_MODE" != "true" ]]; then
         validate_name "$1"
         PROJECT_NAME="$1"
         PROJECT_DIR="$PWD/$PROJECT_NAME"
-        if [[ ! -d "$PROJECT_DIR" ]]; then
-            mkdir "$PROJECT_DIR"
-            log "Created $PROJECT_DIR"
-        fi
     else
         PROJECT_DIR="$PWD"
         PROJECT_NAME="$(basename "$PROJECT_DIR")"
@@ -155,10 +124,12 @@ if [[ "$TEST_MODE" != "true" ]]; then
     fi
 fi
 
+validate_project_path "$PROJECT_DIR"
+
 # ─── Screen ───────────────────────────────────────────────────────────────────
 if [[ -z "${STY:-}" ]]; then
     log "Starting screen session: $PROJECT_NAME"
-    exec screen -S "$PROJECT_NAME" bash -c "cd '$PROJECT_DIR' && '$BOOTSTRAP_DIR/bootstrap.sh'; exec bash"
+    exec screen -S "$PROJECT_NAME" bash -c '"$1" "${@:2}"; exec bash' bash "$BOOTSTRAP_DIR/bootstrap.sh" "$@"
 fi
 
 # ─── Phase 1: Preflight ───────────────────────────────────────────────────────
@@ -171,7 +142,8 @@ phase1_preflight() {
         log "  Project : $PROJECT_NAME"
         log "  Dir     : $PROJECT_DIR"
         echo ""
-        read -r -p "Bootstrap '$PROJECT_NAME' in $PROJECT_DIR? [Y/n]: " path_confirm
+        local path_confirm
+        read_choice path_confirm "Bootstrap '$PROJECT_NAME' in $PROJECT_DIR? [Y/n]: " y yYnN
         if [[ "${path_confirm,,}" == "n" ]]; then
             err "Aborted."
             exit 1
@@ -222,7 +194,8 @@ phase1_preflight() {
     fi
 
     # Ask about bare repo next, so the summary can reflect the choice
-    read -r -p "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " local_repo_ans
+    local local_repo_ans
+    read_choice local_repo_ans "Set up a local bare repo in ~/Repositories/$PROJECT_NAME.git? [Y/n]: " y yYnN
     if [[ "${local_repo_ans,,}" != "n" ]]; then
         SETUP_LOCAL_REPO=true
         BARE_REPO="$HOME/Repositories/$PROJECT_NAME.git"
@@ -246,7 +219,8 @@ phase1_preflight() {
     log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
     echo ""
 
-    read -r -p "Proceed? [Y/n]: " confirm
+    local confirm
+    read_choice confirm "Proceed? [Y/n]: " y yYnN
     [[ "${confirm,,}" == "n" ]] && { err "Aborted."; exit 1; }
     echo ""
 }
@@ -657,7 +631,8 @@ phase9_verify() {
     echo ""
 
     # Bypass permission prompts?
-    read -r -p "  Bypass permission prompts? [Y/n]: " bypass_ans
+    local bypass_ans
+    read_choice bypass_ans "  Bypass permission prompts? [Y/n]: " y yYnN
     local bypass=false
     [[ "${bypass_ans,,}" != "n" ]] && bypass=true
 
@@ -673,7 +648,8 @@ phase9_verify() {
     log "    7) fable[1m]    — fable with 1M context window"
     log "    8) best         — latest fable or opus (plan-dependent)"
     echo ""
-    read -r -p "  Choose model [1-8, default 2]: " model_choice
+    local model_choice
+    read_choice model_choice "  Choose model [1-8, default 2]: " 2 12345678
     local model_val
     case "${model_choice:-2}" in
         1) model_val="haiku" ;;
@@ -684,7 +660,7 @@ phase9_verify() {
         6) model_val="fable" ;;
         7) model_val="fable[1m]" ;;
         8) model_val="best" ;;
-        *) model_val="sonnet" ;;
+        *) err "Invalid validated model choice."; return 1 ;;
     esac
 
     # Effort selection
@@ -695,14 +671,15 @@ phase9_verify() {
     log "    3) high"
     log "    4) max"
     echo ""
-    read -r -p "  Choose effort [1-4, default 2]: " effort_choice
+    local effort_choice
+    read_choice effort_choice "  Choose effort [1-4, default 2]: " 2 1234
     local effort_val
     case "${effort_choice:-2}" in
         1) effort_val="low" ;;
         2) effort_val="medium" ;;
         3) effort_val="high" ;;
         4) effort_val="max" ;;
-        *) effort_val="medium" ;;
+        *) err "Invalid validated effort choice."; return 1 ;;
     esac
 
     # Build command array (array avoids glob expansion on brackets in model names)
@@ -789,6 +766,10 @@ phase9_test_validate() {
         pass=false
     fi
 
+    if ! bash "$BOOTSTRAP_DIR/tests/test-input.sh"; then
+        pass=false
+    fi
+
     # Name validation
     test_name() {
         local name="$1" expect="$2"
@@ -828,6 +809,7 @@ phase9_test_validate() {
     log "Cleaning up test artifacts..."
     rm -rf "$PROJECT_DIR"
     log "  Removed $PROJECT_DIR"
+    [[ "$pass" == "true" ]]
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -838,6 +820,7 @@ main() {
     echo ""
 
     phase1_preflight
+    mkdir -p -- "$PROJECT_DIR"
     phase2_git
     phase3_python
     phase4_root_files
