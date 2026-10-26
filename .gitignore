@@ -6,3 +6,6 @@ __pycache__/
 .claude/settings.local.json
 responses/*
 !responses/.gitkeep
+
+# Private filesystem backups at any depth
+**/backups/

@@ -240,7 +240,7 @@ phase1_preflight() {
         log "  Remote  : none  (add later — docs/adding-remotes.md)"
     fi
     log "  Python  : .venv + requirements.txt stub"
-    log "  Files   : CLAUDE.md  README.md  .gitignore  .env.example  run.sh  test.sh"
+    log "  Files   : CLAUDE.md  AGENTS.md  README.md  .gitignore  .env.example  run.sh  test.sh"
     log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
     log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
     log "  Finish  : pip install  •  copy .env  •  choose model  •  launch claude"
@@ -320,7 +320,7 @@ phase4_root_files() {
     copy_template ".gitattributes" ".gitattributes"
     copy_template ".env.example"   ".env.example"
 
-    for f in CLAUDE.md README.md; do
+    for f in CLAUDE.md AGENTS.md README.md; do
         local dst="$PROJECT_DIR/$f"
         if [[ ! -f "$dst" ]]; then
             sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATES_DIR/$f" > "$dst"
@@ -501,14 +501,9 @@ phase6_structure() {
         log "  tests/ exists — skipping"
     fi
 
-    # responses/ — git tracks the dir but never the content
+    # Private exchanges and attachments stay entirely outside Git.
     mkdir -p "$PROJECT_DIR/responses"
-    if [[ ! -f "$PROJECT_DIR/responses/.gitkeep" ]]; then
-        touch "$PROJECT_DIR/responses/.gitkeep"
-        log "  created responses/"
-    else
-        log "  responses/ exists — skipping"
-    fi
+    log "  responses/ ready (private, git-ignored)"
 
     copy_template "tasks/todo.md"            "tasks/todo.md"
     copy_template "tasks/skills-manifest.md" "tasks/skills-manifest.md"
@@ -530,6 +525,18 @@ phase6_structure() {
 }
 
 # ─── Phase 7: Global setup (idempotent) ───────────────────────────────────────
+backup_config() {
+    local path="$1"
+    [[ -f "$path" ]] || return 0
+    local backup_dir backup
+    backup_dir="$(dirname "$path")/backups"
+    mkdir -p -m 700 -- "$backup_dir"
+    backup="$backup_dir/$(basename "$path").$(date +%Y%m%d-%H%M%S-%N).bak"
+    cp --preserve=all -- "$path" "$backup"
+    cmp -s -- "$path" "$backup"
+    log "  backup: $backup"
+}
+
 phase7_global() {
     log "=== Phase 7: Global setup ==="
 
@@ -549,9 +556,12 @@ phase7_global() {
     if [[ -f "$global_settings" ]]; then
         if ! jq -e '.hooks.PostToolUse[]? | select(.matcher == "Skill") | .hooks[]? | select(.command | contains("auto-import-skill"))' \
                 "$global_settings" &>/dev/null 2>&1; then
+            backup_config "$global_settings"
             local tmp; tmp="$(mktemp)"
             jq '.hooks.PostToolUse += [{"matcher":"Skill","hooks":[{"type":"command","command":"~/.claude/hooks/auto-import-skill.sh","timeout":15,"statusMessage":"Checking skill locality..."}]}]' \
-                "$global_settings" > "$tmp" && mv "$tmp" "$global_settings"
+                "$global_settings" > "$tmp"
+            cat "$tmp" > "$global_settings"
+            rm -- "$tmp"
             log "  wired auto-import-skill in global settings.json"
         else
             log "  global auto-import-skill already wired"
@@ -563,6 +573,7 @@ phase7_global() {
     # ~/.bashrc: CLAUDE_PROTECTED_BRANCHES
     local bashrc="$HOME/.bashrc"
     if ! grep -q "CLAUDE_PROTECTED_BRANCHES" "$bashrc" 2>/dev/null; then
+        backup_config "$bashrc"
         printf '\nexport CLAUDE_PROTECTED_BRANCHES=""\n' >> "$bashrc"
         log "  added CLAUDE_PROTECTED_BRANCHES to ~/.bashrc"
     else
@@ -571,6 +582,7 @@ phase7_global() {
 
     # ~/.bashrc: auto-venv cd override
     if ! grep -q "auto-venv cd override" "$bashrc" 2>/dev/null; then
+        backup_config "$bashrc"
         cat >> "$bashrc" <<'BASHRC'
 
 # auto-venv cd override
@@ -731,6 +743,7 @@ phase9_test_validate() {
     check ".gitignore"          "$PROJECT_DIR/.gitignore"
     check ".gitattributes"      "$PROJECT_DIR/.gitattributes"
     check "CLAUDE.md"           "$PROJECT_DIR/CLAUDE.md"
+    check "AGENTS.md"           "$PROJECT_DIR/AGENTS.md"
     check "README.md"           "$PROJECT_DIR/README.md"
     check "requirements.txt"    "$PROJECT_DIR/requirements.txt"
     check "run.sh"              "$PROJECT_DIR/run.sh"

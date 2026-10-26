@@ -58,3 +58,27 @@ No change needed. Bootstrap copies every `*.sh` it finds in the marketplace hook
 1. Place the hook script in `templates/hooks/`
 2. Add it to the explicit copy loop in `phase5_claude_config()` in `bootstrap.sh`
 3. Add the corresponding entry to `generate_settings_json()` with the correct event type and matcher
+
+## 7. Codex and shared project directives
+
+New projects receive an AGENTS.md entry point that directs Codex to CLAUDE.md.
+Edit templates/CLAUDE.md for both agents' behavior and its Codex-specific section
+for differences in tooling. No user-level Codex configuration is required for
+this entry point. Codex discovers AGENTS.md when a new session starts:
+https://learn.chatgpt.com/docs/agent-configuration/agents-md
+
+The adapter covers Git workflow, project venv selection, private exchange
+archiving, and verified configuration backups. Claude hooks and permission
+settings remain Claude-specific; this does not install equivalent Codex hooks
+or change either tool's status settings. Bootstrap still launches Claude Code;
+Codex can be opened separately in the generated project.
+
+For an existing project, back up its configuration first, add the AGENTS.md
+entry point, and merge shared directive changes deliberately. Do not rerun
+mkproj on a live project or overwrite its CLAUDE.md with the template.
+
+All of responses/ is ignored, with no tracked placeholder. Filesystem backups
+are ignored at every depth. Before modifying existing global configuration,
+bootstrap creates a timestamped, verified copy beside it in backups/, preserving
+file metadata. These are local recovery copies; keep a separate backup against
+loss of the underlying storage.
