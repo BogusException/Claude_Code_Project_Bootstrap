@@ -5,6 +5,8 @@ set -euo pipefail
 
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
+MKPROJ_VERSION="2.0.0"
+INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
 BARE_REPO=""
@@ -17,31 +19,181 @@ err()  { printf "${RED}[bootstrap]${NC} %s\n" "$*" >&2; }
 
 source "$BOOTSTRAP_DIR/lib/input.sh"
 source "$BOOTSTRAP_DIR/lib/runtime.sh"
+source "$BOOTSTRAP_DIR/lib/registry.sh"
+source "$BOOTSTRAP_DIR/lib/update.sh"
 CREATED_FILES=()
 TEST_ROOT=""
 TEST_PARENT=""
 CURRENT_PHASE=initialize
 usage() {
-    cat <<'EOF'
-mkproj: Linux Python projects with shared Claude Code / Codex directives
+    local pager=""
+    [[ -t 1 ]] && command -v less >/dev/null && pager="less -F"
+    _usage_text | ${pager:-cat}
+}
+_usage_text() {
+cat <<'MANPAGE'
+NAME
+       mkproj - bootstrap and maintain Claude Code Python projects
 
-Usage:
-  mkproj [--no-global] [--agent=claude|codex|none] [name]
-  mkproj --dry-run [--no-global] [--agent=claude|codex|none] [name]
-  mkproj --doctor [name]       read-only environment and privacy diagnostics
-  mkproj --test                isolated scaffold + negative tests; no global edits/pushes
-  mkproj --help
+SYNOPSIS
+       mkproj [--no-global] [--agent=claude|codex|none] [--keybindings] [NAME]
+       mkproj --update [NAME]
+       mkproj --scan [DIR]
+       mkproj --status [DIR]
+       mkproj --pending [DIR]
+       mkproj --adopt [NAME]
+       mkproj --dry-run [--no-global] [--agent=claude|codex|none] [NAME]
+       mkproj --doctor [NAME]
+       mkproj --test
+       mkproj --version
+       mkproj --help
 
-Names: 1-64 ASCII characters, starting a-z, followed by a-z, 0-9, underscore.
-Python keywords are refused. Full project paths are limited to 2048 bytes.
-Prompt answers are one character; invalid answers reprompt and EOF aborts.
-Existing repositories, remotes, user files, and configuration are preserved.
-Bare destination collisions abort; no overwrite or destructive collision option exists.
-Global shell/hook changes are opt-in and receive verified timestamped backups.
-New projects get CLAUDE.md plus an AGENTS.md pointer and native private-path guards.
-A project venv is verified before dependency installation and commits.
-Status settings are never configured by mkproj.
-EOF
+DESCRIPTION
+       mkproj bootstraps a complete Claude Code Python project from an empty
+       directory and maintains it over time. On first run it creates a git
+       repository, Python virtual environment, CLAUDE.md, AGENTS.md, hook
+       scripts, permission rules, and project structure. It records every
+       installed file in a .mkproj marker so future runs can update them
+       safely.
+
+       Subsequent runs (--update, --scan) compare each installed file against
+       the current template. Files you have not touched are updated silently.
+       Files you have edited are left alone. Files where both you and the
+       template changed are presented one at a time for a manual decision.
+
+       A file you delete is never reinstalled. Remove its entry from .mkproj
+       if you change your mind.
+
+OPTIONS
+       --no-global
+              Skip changes to ~/.bashrc, ~/.claude/settings.json, and global
+              hooks. Useful when running in CI or on shared machines.
+
+       --agent=claude|codex|none
+              Choose which agent to launch after setup. Default: ask.
+
+       --keybindings
+              Install ~/.claude/keybindings.json from the bundled template.
+              Default: off. Keybindings are personal; use this flag only on
+              machines where you want the managed defaults.
+
+       --dry-run
+              Show what would be created or changed without writing anything.
+              Works with the default setup mode.
+
+       --yes, -y
+              Accept all non-conflict updates without prompting. On conflicts,
+              automatically keeps the existing file (safe default).
+
+       --quiet, -q
+              Suppress informational output. Errors and conflict prompts are
+              still shown.
+
+       --verbose, -v
+              Show every file decision including up-to-date skips.
+
+MODES
+       (default)
+              Bootstrap a new project in the current directory or NAME.
+
+       --update [NAME]
+              Update an existing mkproj project. NAME defaults to the current
+              directory. Compares every tracked file against its template and
+              applies the decision table (see FILES section).
+
+       --scan [DIR]
+              Recursively find and update all mkproj projects under DIR.
+              DIR defaults to the current directory. Skips .git/, .venv/,
+              node_modules/, and __pycache__/. Presents non-managed Claude
+              Code projects separately and offers to adopt them.
+
+       --status [DIR]
+              Dry-run scan: print one line per project showing its installed
+              mkproj version vs the current tool version and a file change
+              summary. No files are written. Exit code 2 if any project has
+              pending updates or conflicts.
+
+       --pending [DIR]
+              Find all deferred decisions across projects under DIR and
+              present them interactively one by one.
+
+       --adopt [NAME]
+              Enroll an existing Claude Code project (one with .claude/ or
+              CLAUDE.md but no .mkproj) into mkproj management. Only adds
+              missing files; never modifies existing ones. Creates .mkproj
+              recording the current state.
+
+       --doctor [NAME]
+              Read-only diagnostics: check environment and project health
+              without changing anything.
+
+       --test Isolated end-to-end scaffold and negative tests. No global
+              changes or pushes.
+
+       --version
+              Print mkproj version and exit.
+
+       --help Print this page and exit.
+
+FILES
+       .mkproj
+              Per-project identity and file-tracking record. JSON. Gitignored.
+              Contains installed mkproj version, install/update timestamps,
+              and per-file hash pairs (template hash + installed hash).
+
+       ~/.claude/keybindings.json.last-installed-hash
+              Hash sidecar for keybindings template tracking. Used only when
+              --keybindings is active.
+
+       templates/
+              All files mkproj installs into new projects. Edit these to
+              change what every future (and updated) project receives.
+
+EXIT STATUS
+       0      Success.
+       1      Error. Message written to stderr.
+       2      --status or --scan found projects with pending updates or
+              unresolved conflicts.
+
+ENVIRONMENT
+       HOME          Locates ~/.claude/ for global configuration.
+       TMPDIR        Scratch space for --test mode.
+       STY           If unset, mkproj wraps itself in a screen session for
+                     interactive agent launches.
+
+NAMES
+       Project names: 1-64 ASCII characters, starting a-z, followed by
+       a-z, 0-9, or underscore. Python keywords are refused. Full project
+       paths are limited to 2048 bytes.
+
+EXAMPLES
+       # Bootstrap a new project
+       cd ~/Projects && mkproj my_app
+
+       # Bootstrap with keybindings installed
+       mkproj --keybindings my_app
+
+       # Update a single project
+       cd ~/Projects/my_app && mkproj --update
+
+       # Update all projects under ~/Projects
+       mkproj --scan ~/Projects
+
+       # See what would change without touching anything
+       mkproj --status ~/Projects
+
+       # Enroll an existing project
+       cd ~/Projects/legacy_project && mkproj --adopt
+
+       # Non-interactive update (keep all conflicts)
+       mkproj --scan ~/Projects --yes --quiet
+
+SEE ALSO
+       claude(1), codex(1), git(1), screen(1)
+
+       Project repository and documentation:
+       https://github.com/theitguys/project-bootstrap
+MANPAGE
 }
 cleanup_test() {
     [[ -n "$TEST_ROOT" && -d "$TEST_ROOT" && ! -L "$TEST_ROOT" &&
@@ -51,7 +203,7 @@ cleanup_test() {
 initialize() {
     parse_args "$@"
     CONFIGURE_GLOBAL=false
-    if [[ "$MODE" == help ]]; then return 0; fi
+    if [[ "$MODE" == help || "$MODE" == version || "$MODE" == scan || "$MODE" == status || "$MODE" == pending ]]; then return 0; fi
     if [[ "$MODE" == test ]]; then
         TEST_MODE=true
         unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
@@ -504,31 +656,56 @@ BASHRC
     fi
     if [[ "$changed" == true ]]; then replace_config "$bashrc" "$content"$'\n'; fi
 
-    local kb_src="$TEMPLATES_DIR/keybindings.json"
-    local kb_dst="$global_root/.claude/keybindings.json"
-    local kb_hash_file="$global_root/.claude/keybindings.json.last-installed-hash"
-    local template_hash
-    template_hash="$(sha256sum "$kb_src" | cut -d' ' -f1)"
-    if [[ ! -e "$kb_dst" ]]; then
-        mkdir -p -- "$(dirname "$kb_dst")"
-        cp -- "$kb_src" "$kb_dst"
-        printf '%s\n' "$template_hash" > "$kb_hash_file"
-        log "  keybindings: installed"
-    else
-        local installed_hash=""
-        [[ -f "$kb_hash_file" ]] && installed_hash="$(< "$kb_hash_file")"
-        if [[ -z "$installed_hash" ]]; then
-            printf '%s\n' "$template_hash" > "$kb_hash_file"
-            log "  keybindings: present (no install record; recorded current template hash)"
-        elif [[ "$template_hash" != "$installed_hash" ]]; then
-            backup_config "$kb_dst" || return
+    if [[ "$INSTALL_KEYBINDINGS" == true ]]; then
+        local kb_src="$TEMPLATES_DIR/keybindings.json"
+        local kb_dst="$global_root/.claude/keybindings.json"
+        local kb_hash_file="$global_root/.claude/keybindings.json.last-installed-hash"
+        local template_hash
+        template_hash="$(sha256sum "$kb_src" | cut -d' ' -f1)"
+        if [[ ! -e "$kb_dst" ]]; then
+            mkdir -p -- "$(dirname "$kb_dst")"
             cp -- "$kb_src" "$kb_dst"
             printf '%s\n' "$template_hash" > "$kb_hash_file"
-            log "  keybindings: updated (template changed)"
+            log "  keybindings: installed"
         else
-            log "  keybindings: up to date"
+            local installed_hash=""
+            [[ -f "$kb_hash_file" ]] && installed_hash="$(< "$kb_hash_file")"
+            if [[ -z "$installed_hash" ]]; then
+                printf '%s\n' "$template_hash" > "$kb_hash_file"
+                log "  keybindings: present (no install record; recorded current template hash)"
+            elif [[ "$template_hash" != "$installed_hash" ]]; then
+                backup_config "$kb_dst" || return
+                cp -- "$kb_src" "$kb_dst"
+                printf '%s\n' "$template_hash" > "$kb_hash_file"
+                log "  keybindings: updated (template changed)"
+            else
+                log "  keybindings: up to date"
+            fi
         fi
     fi
+}
+
+write_registry_initial() {
+    local components='["core","venv","docs","tasks","hooks","rules","settings"]'
+    registry_create "$PROJECT_DIR" "$MKPROJ_VERSION" "$components"
+    local tpl_file rel tpl_hash disk_hash
+    while IFS= read -r -d '' tpl_file; do
+        rel="$(template_to_project_path "$tpl_file")"
+        [[ -n "$rel" ]] || continue
+        [[ -f "$PROJECT_DIR/$rel" ]] || continue
+        tpl_hash="$(sha256sum "$tpl_file" | cut -d' ' -f1)"
+        disk_hash="$(sha256sum "$PROJECT_DIR/$rel" | cut -d' ' -f1)"
+        registry_set_file "$PROJECT_DIR" "$rel" "$tpl_hash" "$disk_hash" "installed"
+    done < <(find "$TEMPLATES_DIR" -type f \( \
+        ! -path "*/backups/*" ! -name "*.bak" \
+        \) -print0)
+    if [[ -f "$PROJECT_DIR/.claude/settings.json" ]]; then
+        local gen_hash
+        gen_hash="$(generate_settings_json | sha256sum | cut -d' ' -f1)"
+        disk_hash="$(sha256sum "$PROJECT_DIR/.claude/settings.json" | cut -d' ' -f1)"
+        registry_set_file "$PROJECT_DIR" ".claude/settings.json" "$gen_hash" "$disk_hash" "installed"
+    fi
+    log "  wrote .mkproj"
 }
 
 # ─── Phase 8: Initial commit ──────────────────────────────────────────────────
@@ -544,6 +721,7 @@ phase8_commit() {
             git -C "$PROJECT_DIR" commit -m "$message"
         fi
     fi
+    write_registry_initial
     if [[ "$TEST_MODE" == true ]]; then
         log "Test mode: remote push skipped."
     elif git -C "$PROJECT_DIR" remote get-url origin >/dev/null 2>&1; then
@@ -749,6 +927,49 @@ phase9_test_validate() {
     test_name "bad@name"     invalid
     test_name "bad.name"     invalid
 
+    # .mkproj registry tests
+    if [[ -f "$PROJECT_DIR/.mkproj" ]]; then
+        log "  PASS  .mkproj created"
+    else
+        err "  FAIL  .mkproj missing"
+        pass=false
+    fi
+    if jq empty "$PROJECT_DIR/.mkproj" 2>/dev/null; then
+        log "  PASS  .mkproj valid JSON"
+    else
+        err "  FAIL  .mkproj invalid JSON"
+        pass=false
+    fi
+    local mkproj_ver; mkproj_ver="$(jq -r '.mkproj_version' "$PROJECT_DIR/.mkproj" 2>/dev/null)"
+    if [[ "$mkproj_ver" == "$MKPROJ_VERSION" ]]; then
+        log "  PASS  .mkproj version $mkproj_ver"
+    else
+        err "  FAIL  .mkproj version mismatch: got '$mkproj_ver', expected '$MKPROJ_VERSION'"
+        pass=false
+    fi
+    local claude_md_status; claude_md_status="$(jq -r '.files["CLAUDE.md"].status // "missing"' "$PROJECT_DIR/.mkproj" 2>/dev/null)"
+    if [[ "$claude_md_status" == "installed" ]]; then
+        log "  PASS  .mkproj tracks CLAUDE.md"
+    else
+        err "  FAIL  .mkproj CLAUDE.md status: '$claude_md_status'"
+        pass=false
+    fi
+    if grep -qxF ".mkproj" "$PROJECT_DIR/.gitignore"; then
+        log "  PASS  .mkproj in .gitignore"
+    else
+        err "  FAIL  .mkproj missing from .gitignore"
+        pass=false
+    fi
+
+    # --version test
+    local ver_out; ver_out="$(mkproj --version 2>&1)"
+    if [[ "$ver_out" == "mkproj $MKPROJ_VERSION" ]]; then
+        log "  PASS  --version output: $ver_out"
+    else
+        err "  FAIL  --version: expected 'mkproj $MKPROJ_VERSION', got '$ver_out'"
+        pass=false
+    fi
+
     echo ""
     if [[ "$pass" == "true" ]]; then
         log "All checks passed. Bootstrap is working correctly."
@@ -760,6 +981,134 @@ phase9_test_validate() {
     log "Cleaning up test artifacts..."
     log "Temporary artifacts will be removed by the test cleanup trap."
     [[ "$pass" == "true" ]]
+}
+
+run_update_mode() {
+    local target="$PROJECT_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || _is_claude_project "$target" || {
+        err "Not a mkproj or Claude Code project: $target"; return 1
+    }
+    log "Updating: $target"
+    update_project "$target"
+}
+
+run_scan_mode() {
+    local had_issues=false
+    local managed=() unmanaged=()
+    while IFS= read -r line; do
+        case "$line" in
+            managed:*)   managed+=("${line#managed:}") ;;
+            unmanaged:*) unmanaged+=("${line#unmanaged:}") ;;
+        esac
+    done < <(scan_projects "$SCAN_DIR")
+
+    for d in "${managed[@]}"; do
+        log "=== $d ==="
+        update_project "$d" || had_issues=true
+    done
+
+    if (( ${#unmanaged[@]} )); then
+        printf '\nClaude Code projects (not managed by mkproj):\n'
+        for d in "${unmanaged[@]}"; do
+            printf '  %s\n' "$d"
+            if [[ "$YES_MODE" == true ]]; then
+                adopt_project "$d"
+            else
+                local adopt_ans
+                read_choice adopt_ans "  Adopt this project? [y/N]: " n yYnN
+                [[ "${adopt_ans,,}" == y ]] && adopt_project "$d"
+            fi
+        done
+    fi
+
+    [[ "$had_issues" == false ]]
+}
+
+run_status_mode() {
+    local managed=() unmanaged=()
+    while IFS= read -r line; do
+        case "$line" in
+            managed:*)   managed+=("${line#managed:}") ;;
+            unmanaged:*) unmanaged+=("${line#unmanaged:}") ;;
+        esac
+    done < <(scan_projects "$SCAN_DIR")
+
+    local exit_code=0
+    printf '\nManaged projects (%d):\n' "${#managed[@]}"
+    for d in "${managed[@]}"; do
+        local inst_ver changes
+        inst_ver="$(registry_read "$d" '.mkproj_version // "?"')"
+        changes=0
+        while IFS= read -r -d '' f; do
+            local rel; rel="$(template_to_project_path "$f")"
+            [[ -n "$rel" ]] || continue
+            local dec; dec="$(file_update_decision "$d" "$rel")"
+            [[ "$dec" == "auto_update" || "$dec" == "conflict" ]] && (( changes++ )) || true
+        done < <(find "$TEMPLATES_DIR" -type f \( ! -path "*/backups/*" ! -name "*.bak" \) -print0)
+        (( changes > 0 )) && exit_code=2 || true
+        local status_str
+        if (( changes == 0 )); then
+            status_str="up to date"
+        else
+            status_str="$changes files pending"
+        fi
+        printf '  %-30s  installed %-8s  current %-8s  %s\n' \
+            "$(basename "$d")" "$inst_ver" "$MKPROJ_VERSION" "$status_str"
+    done
+
+    if (( ${#unmanaged[@]} )); then
+        printf '\nClaude Code projects (not managed, %d):\n' "${#unmanaged[@]}"
+        for d in "${unmanaged[@]}"; do
+            printf '  %-30s  no .mkproj -- run: mkproj --adopt %s\n' \
+                "$(basename "$d")" "$(basename "$d")"
+            exit_code=2
+        done
+    fi
+
+    return "$exit_code"
+}
+
+run_pending_mode() {
+    local managed=()
+    while IFS= read -r line; do
+        [[ "$line" == managed:* ]] && managed+=("${line#managed:}")
+    done < <(scan_projects "$SCAN_DIR")
+
+    local found=false
+    for d in "${managed[@]}"; do
+        registry_exists "$d" || continue
+        while IFS= read -r rel; do
+            local st; st="$(registry_file_status "$d" "$rel")"
+            [[ "$st" == "deferred" ]] || continue
+            found=true
+            log "Pending: $d / $rel"
+            local choice; choice="$(show_conflict_ui "$d" "$rel")"
+            case "$choice" in
+                u) apply_template_file "$d" "$rel" ;;
+                k) registry_set_file "$d" "$rel" \
+                       "$(current_template_hash "$rel")" \
+                       "$(sha256sum "$d/$rel" | cut -d' ' -f1)" "installed" ;;
+                d) : ;;
+                s) return 0 ;;
+            esac
+        done < <(registry_all_files "$d")
+    done
+
+    [[ "$found" == true ]] || log "No pending decisions found under $SCAN_DIR."
+}
+
+run_adopt_mode() {
+    local target="$PROJECT_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    if registry_exists "$target"; then
+        log "Already managed: $target"
+        return 0
+    fi
+    _is_claude_project "$target" || {
+        err "No .claude/ or CLAUDE.md found in: $target"; return 1
+    }
+    adopt_project "$target"
 }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -780,6 +1129,13 @@ main() {
         exec {BARE_LOCK_FD}>"$lock_dir/$lock_key"
         flock -n "$BARE_LOCK_FD" || { err "Another mkproj instance owns the bare destination."; return 1; }
     fi
+    case "$MODE" in
+        update)  run_update_mode;  exit $? ;;
+        scan)    run_scan_mode;    exit $? ;;
+        status)  run_status_mode;  exit $? ;;
+        pending) run_pending_mode; exit $? ;;
+        adopt)   run_adopt_mode;   exit $? ;;
+    esac
     check_project_repo
     check_repo_destination
     mkdir -p -- "$PROJECT_DIR"
@@ -808,9 +1164,10 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     trap 'status=$?; err "mkproj failed in phase $CURRENT_PHASE (line $LINENO, exit $status). Existing project data and backups are retained."; exit "$status"' ERR
     initialize "$@"
     case "$MODE" in
-        help) usage ;;
-        doctor) doctor ;;
+        help)    usage ;;
+        version) printf 'mkproj %s\n' "$MKPROJ_VERSION" ;;
+        doctor)  doctor ;;
         dry-run) dry_run ;;
-        *) main ;;
+        *)       main ;;
     esac
 fi

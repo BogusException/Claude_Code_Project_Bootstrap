@@ -14,11 +14,20 @@ detached HEAD, conflicting origins, and unrelated bare-repository destinations.
 ## Commands
 
     mkproj --help
+    mkproj --version
     mkproj --dry-run --agent=none my_tool
     mkproj --doctor
     mkproj --test
     mkproj --no-global --agent=codex my_tool
     mkproj --no-global --agent=none my_tool
+    mkproj --keybindings my_tool
+
+    # Update and maintenance
+    mkproj --update                   # update current project
+    mkproj --scan ~/Projects          # update all projects under a directory
+    mkproj --status ~/Projects        # dry-run: show what would change
+    mkproj --pending ~/Projects       # resolve all deferred conflict decisions
+    mkproj --adopt                    # enroll an existing Claude Code project
 
 Names are 1-64 lowercase ASCII letters/digits/underscores, beginning with a letter.
 Python keywords are refused; the full project path is limited to 2048 bytes.

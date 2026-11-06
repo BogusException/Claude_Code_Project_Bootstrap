@@ -55,6 +55,9 @@ desktop.ini
 .codex/sessions/
 .codex/log/
 
+# mkproj project identity (per-project, not for version control)
+.mkproj
+
 # Private keys and credential containers
 *.pem
 *.key

@@ -58,3 +58,63 @@ launching either agent. --no-global skips shell/global hook configuration.
 --test is isolated and never pushes or edits user-global configuration.
 --dry-run and --doctor are read-only.
 See reliability.md for backups, recovery, failure handling, and guard limitations.
+
+## Updating existing projects
+
+After upgrading mkproj, update a single project:
+
+    cd ~/Projects/my_tool && mkproj --update
+
+Update every mkproj-managed project under a directory:
+
+    mkproj --scan ~/Projects
+
+See which projects have pending changes without touching anything (exits 2 if any):
+
+    mkproj --status ~/Projects
+
+The update decision for each file follows this table:
+
+- Template unchanged, disk unchanged: skip (up to date)
+- Template changed, disk unchanged: apply silently
+- Template unchanged, disk changed: skip (keep user edits)
+- Both changed: conflict prompt (update / keep / defer / stop)
+- File deleted by user: skip permanently
+- New file in template: install
+
+Add `--yes` to skip conflict prompts and keep all user edits. Add `--quiet` to
+suppress informational output. Add `--verbose` to see every file decision,
+including up-to-date skips.
+
+The `.mkproj` file in each project tracks the installed mkproj version,
+install/update timestamps, and per-file hash pairs. It is gitignored and
+never committed.
+
+Deferred conflicts are saved with status `deferred` in `.mkproj`. Review them
+all at once:
+
+    mkproj --pending ~/Projects
+
+## Enrolling an existing project
+
+If you have a Claude Code project (one with `.claude/` or `CLAUDE.md`) that was
+not bootstrapped with mkproj, enroll it:
+
+    cd ~/Projects/legacy_project && mkproj --adopt
+
+Adopt never modifies existing files. It only adds missing entries to `.gitignore`
+and installs AGENTS.md if absent, then writes `.mkproj` recording the current
+state. After adoption, `--update` can install new template files and track
+further changes.
+
+## Keybindings
+
+By default mkproj does not touch `~/.claude/keybindings.json`. Pass
+`--keybindings` to install or update it from the bundled template:
+
+    mkproj --keybindings my_tool
+
+The template is at `templates/keybindings.json`. mkproj records the installed
+hash in `~/.claude/keybindings.json.last-installed-hash` and updates the file
+only when the template changes. If you have customized keybindings, do not use
+`--keybindings` -- that flag is for machines where you want the managed defaults.

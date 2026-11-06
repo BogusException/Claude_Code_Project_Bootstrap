@@ -25,20 +25,40 @@ parse_args() {
     HAS_PROJECT_ARG=false
     LAUNCH_AGENT=ask
     NO_GLOBAL=false
+    INSTALL_KEYBINDINGS=false
+    SCAN_DIR=""
+    YES_MODE=false
+    QUIET=false
+    VERBOSE=false
     local arg mode_seen=false agent_seen=false
     (( $# <= 4 )) || { err "Too many arguments."; return 1; }
     for arg in "$@"; do
         case "$arg" in
-            --help|-h|--usage|--test|--doctor|--dry-run)
+            --help|-h|--usage|--test|--doctor|--dry-run|--update|--scan|--status|--pending|--adopt|--version)
                 [[ "$mode_seen" == false ]] || { err "Choose one command mode."; return 1; }
                 mode_seen=true
-                case "$arg" in --help|-h|--usage) MODE=help;; --test) MODE=test;; --doctor) MODE=doctor;; --dry-run) MODE=dry-run;; esac ;;
+                case "$arg" in
+                    --help|-h|--usage) MODE=help ;;
+                    --test)            MODE=test ;;
+                    --doctor)          MODE=doctor ;;
+                    --dry-run)         MODE=dry-run ;;
+                    --update)          MODE=update ;;
+                    --scan)            MODE=scan ;;
+                    --status)          MODE=status ;;
+                    --pending)         MODE=pending ;;
+                    --adopt)           MODE=adopt ;;
+                    --version)         MODE=version ;;
+                esac ;;
             --agent=claude|--agent=codex|--agent=none)
                 [[ "$agent_seen" == false ]] || { err "Duplicate agent option."; return 1; }
                 LAUNCH_AGENT="${arg#--agent=}"; agent_seen=true ;;
             --no-global)
                 [[ "$NO_GLOBAL" == false ]] || { err "Duplicate --no-global."; return 1; }
                 NO_GLOBAL=true ;;
+            --keybindings) INSTALL_KEYBINDINGS=true ;;
+            --yes|-y)      YES_MODE=true ;;
+            --quiet|-q)    QUIET=true ;;
+            --verbose|-v)  VERBOSE=true ;;
             -*)
                 err "Unknown option. Use --help."; return 1 ;;
             *)
@@ -47,11 +67,20 @@ parse_args() {
                 PROJECT_ARG="$arg"; HAS_PROJECT_ARG=true ;;
         esac
     done
-    if [[ "$MODE" == help || "$MODE" == test ]]; then
+    if [[ "$MODE" == help || "$MODE" == test || "$MODE" == version ]]; then
         (( $# == 1 )) || { err "This mode takes no additional arguments."; return 1; }
     fi
     if [[ "$MODE" == doctor && ( "$agent_seen" == true || "$NO_GLOBAL" == true ) ]]; then
         err "--doctor takes only an optional project name."; return 1
+    fi
+    # scan/status/pending accept a dir arg, not a project name
+    if [[ "$MODE" == scan || "$MODE" == status || "$MODE" == pending ]]; then
+        if [[ "$HAS_PROJECT_ARG" == true ]]; then
+            SCAN_DIR="$PROJECT_ARG"
+            HAS_PROJECT_ARG=false
+            PROJECT_ARG=""
+        fi
+        [[ -z "$SCAN_DIR" ]] && SCAN_DIR="$PWD"
     fi
 }
 validate_cli_args() { parse_args "$@"; }

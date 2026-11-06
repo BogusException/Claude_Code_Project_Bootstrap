@@ -7,6 +7,7 @@ Section references use the format: `filename §N.N`
 
 **A**
 
+**--adopt (enroll non-mkproj project)** -- usage.md §9
 **Auto-commit hook** -- how-it-works.md §4.2
 **Auto-venv (cd override)** -- how-it-works.md §3 (phase 7 row)
 
@@ -52,6 +53,7 @@ Section references use the format: `filename §N.N`
 
 **mkproj --help** -- usage.md §1
 **mkproj --test** -- usage.md §7
+**.mkproj (project identity file)** -- usage.md §8
 
 **P**
 
@@ -68,16 +70,22 @@ Section references use the format: `filename §N.N`
 **S**
 
 **save-response hook** -- how-it-works.md §4.2
+**--scan (recursive update)** -- usage.md §8
 **Screen session** -- how-it-works.md §2
 **settings.json** -- how-it-works.md §5
 **SourceForge remote** -- adding-remotes.md §4
 **SSH keys** -- adding-remotes.md §3.2
+**--status (dry-run scan)** -- usage.md §8
 
 **T**
 
 **tasks/ directory** -- usage.md §6
 **Templates** -- customizing.md §1
 **Troubleshooting** -- troubleshooting.md
+
+**U**
+
+**--update (update single project)** -- usage.md §8
 
 **V**
 

@@ -10,6 +10,17 @@
 - [x] Run negative and failure-injection integration tests.
 - [x] Update documentation and prepare the reviewed commit.
 
+## Deferred from v2.0.0
+
+- [ ] `--update --components=hooks,rules` selective component updates
+- [ ] `--max-depth N` for scan depth control
+- [ ] `--force` flag (requires audit trail before overwriting user edits)
+- [ ] Component-level options in `--adopt`
+- [ ] `--json` machine-readable output for scripting
+- [ ] `mkproj --init` alias for the default bootstrap mode
+- [ ] Windows native support (WSL2 recommended in the interim)
+- [ ] `mkproj --diff NAME` -- show pending changes without updating
+
 ## Validation
 
 182 input/boundary/no-side-effect checks and 27 Linux regression tests pass.
