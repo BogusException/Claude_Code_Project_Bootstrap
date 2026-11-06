@@ -503,6 +503,32 @@ BASHRC
         warn "Custom auto-venv function retained; review its environment switching manually."
     fi
     if [[ "$changed" == true ]]; then replace_config "$bashrc" "$content"$'\n'; fi
+
+    local kb_src="$TEMPLATES_DIR/keybindings.json"
+    local kb_dst="$global_root/.claude/keybindings.json"
+    local kb_hash_file="$global_root/.claude/keybindings.json.last-installed-hash"
+    local template_hash
+    template_hash="$(sha256sum "$kb_src" | cut -d' ' -f1)"
+    if [[ ! -e "$kb_dst" ]]; then
+        mkdir -p -- "$(dirname "$kb_dst")"
+        cp -- "$kb_src" "$kb_dst"
+        printf '%s\n' "$template_hash" > "$kb_hash_file"
+        log "  keybindings: installed"
+    else
+        local installed_hash=""
+        [[ -f "$kb_hash_file" ]] && installed_hash="$(< "$kb_hash_file")"
+        if [[ -z "$installed_hash" ]]; then
+            printf '%s\n' "$template_hash" > "$kb_hash_file"
+            log "  keybindings: present (no install record; recorded current template hash)"
+        elif [[ "$template_hash" != "$installed_hash" ]]; then
+            backup_config "$kb_dst" || return
+            cp -- "$kb_src" "$kb_dst"
+            printf '%s\n' "$template_hash" > "$kb_hash_file"
+            log "  keybindings: updated (template changed)"
+        else
+            log "  keybindings: up to date"
+        fi
+    fi
 }
 
 # ─── Phase 8: Initial commit ──────────────────────────────────────────────────

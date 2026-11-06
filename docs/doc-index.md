@@ -43,6 +43,11 @@ Section references use the format: `filename §N.N`
 
 **jq (requirement)** -- install.md §1
 
+**K**
+
+**Keybindings (terminal submit keys)** -- keybindings.md §2
+**Keybindings (update policy)** -- keybindings.md §3
+
 **M**
 
 **mkproj --help** -- usage.md §1
