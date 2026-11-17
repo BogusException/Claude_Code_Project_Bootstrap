@@ -17,8 +17,8 @@ reject() {
     count=$((count + 1))
 }
 printf -v name64 'a%063d' 0
-for name in a my_tool agent2024 "$name64"; do accept validate_name "$name"; done
-for name in "" MyTool UPPER _bad 2bad my-tool "my tool" " bad" "bad " "bad.name" "bad/name" "../escape" 'bad\name' 'a;touch marker' 'a$(touch marker)' $'a\nb' $'a\rb' $'a\tb' $'a\033b' "café" "ａｂｃ" "${name64}a"; do
+for name in a my_tool agent2024 my-tool a-b-c claude-skill-goal "$name64"; do accept validate_name "$name"; done
+for name in "" MyTool UPPER _bad 2bad tool- my--tool "my tool" " bad" "bad " "bad.name" "bad/name" "../escape" 'bad\name' 'a;touch marker' 'a$(touch marker)' $'a\nb' $'a\rb' $'a\tb' $'a\033b' "café" "ａｂｃ" "${name64}a"; do
     reject validate_name "$name"
 done
 for name in and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield; do
@@ -113,7 +113,7 @@ fi
 [[ ! -e "$scratch/calls" && ! -e "$scratch/work/valid_name" ]] || exit 1
 count=$((count + 1))
 # Valid CLI names must actually reach the first confirmation, not fail validation.
-for valid in a my_tool "$name64"; do
+for valid in a my_tool my-tool "$name64"; do
     output="$(cd "$scratch/work" && STY=isolated PATH="$scratch/bin:$PATH" bash "$ROOT/bootstrap.sh" "$valid" <<< n 2>&1)" && exit 1
     [[ "$output" == *"Aborted."* ]] || { err "FAIL: valid CLI name rejected before confirmation"; exit 1; }
     [[ ! -e "$scratch/calls" && ! -e "$scratch/work/$valid" ]] || exit 1

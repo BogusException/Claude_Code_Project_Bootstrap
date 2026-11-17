@@ -8,8 +8,16 @@ validate_name() {
         err "Project name must contain 1-$MKPROJ_NAME_MAX ASCII characters."
         return 1
     fi
-    if [[ ! "$name" =~ ^[a-z][a-z0-9_]*$ ]]; then
-        err "Project name must start with a-z and contain only a-z, 0-9, and underscore."
+    if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+        err "Project name must start with a-z and contain only a-z, 0-9, underscore, or hyphen."
+        return 1
+    fi
+    if [[ "$name" == *- ]]; then
+        err "Project name must not end with a hyphen."
+        return 1
+    fi
+    if [[ "$name" == *--* ]]; then
+        err "Project name must not contain consecutive hyphens."
         return 1
     fi
     case "$name" in

@@ -5,7 +5,7 @@ set -euo pipefail
 
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
-MKPROJ_VERSION="2.0.0"
+MKPROJ_VERSION="2.1.0"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
@@ -163,8 +163,10 @@ ENVIRONMENT
 
 NAMES
        Project names: 1-64 ASCII characters, starting a-z, followed by
-       a-z, 0-9, or underscore. Python keywords are refused. Full project
-       paths are limited to 2048 bytes.
+       a-z, 0-9, underscore, or hyphen (no trailing or consecutive hyphens).
+       Python keywords are refused. Full project paths are limited to 2048
+       bytes. When the name contains hyphens, the Python module directory
+       under src/ uses underscores (e.g. my-tool -> src/my_tool/).
 
 EXAMPLES
        # Bootstrap a new project
@@ -300,7 +302,7 @@ phase1_preflight() {
     log "  Python  : .venv + requirements.txt stub"
     log "  Files   : CLAUDE.md  AGENTS.md  README.md  .gitignore  .env.example  run.sh  test.sh"
     log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
-    log "  Dirs    : src/$PROJECT_NAME/  tests/  docs/  tasks/  responses/"
+    log "  Dirs    : src/${PROJECT_NAME//-/_}/  tests/  docs/  tasks/  responses/"
     log "  Global  : $CONFIGURE_GLOBAL (verified configuration backups before edits)"
     log "  Launch  : $LAUNCH_AGENT"
     echo ""
@@ -550,13 +552,14 @@ phase6_structure() {
     log "=== Phase 6: Project structure ==="
 
     # src/<module>/ and tests/
-    if [[ ! -d "$PROJECT_DIR/src/$PROJECT_NAME" ]]; then
-        mkdir -p "$PROJECT_DIR/src/$PROJECT_NAME"
-        touch "$PROJECT_DIR/src/$PROJECT_NAME/__init__.py"
-        CREATED_FILES+=("src/$PROJECT_NAME/__init__.py")
-        log "  created src/$PROJECT_NAME/"
+    local MODULE_NAME="${PROJECT_NAME//-/_}"
+    if [[ ! -d "$PROJECT_DIR/src/$MODULE_NAME" ]]; then
+        mkdir -p "$PROJECT_DIR/src/$MODULE_NAME"
+        touch "$PROJECT_DIR/src/$MODULE_NAME/__init__.py"
+        CREATED_FILES+=("src/$MODULE_NAME/__init__.py")
+        log "  created src/$MODULE_NAME/"
     else
-        log "  src/$PROJECT_NAME/ exists — skipping"
+        log "  src/$MODULE_NAME/ exists — skipping"
     fi
     if [[ ! -d "$PROJECT_DIR/tests" ]]; then
         mkdir -p "$PROJECT_DIR/tests"
@@ -857,7 +860,7 @@ phase9_test_validate() {
     check ".env.example"        "$PROJECT_DIR/.env.example"
 
     # Directories
-    check "src/$PROJECT_NAME/"   "$PROJECT_DIR/src/$PROJECT_NAME"  d
+    check "src/${PROJECT_NAME//-/_}/"   "$PROJECT_DIR/src/${PROJECT_NAME//-/_}"  d
     check "tests/"              "$PROJECT_DIR/tests"             d
     check "docs/"               "$PROJECT_DIR/docs"              d
     check "tasks/"              "$PROJECT_DIR/tasks"             d
@@ -918,14 +921,17 @@ phase9_test_validate() {
     test_name "agent2024"    valid
     test_name "a"            valid
     test_name "abc_123"      valid
-    test_name "my-tool"      invalid
-    test_name "MyTool"       invalid
-    test_name "UPPER"        invalid
-    test_name "2bad"         invalid
-    test_name "_bad"         invalid
-    test_name "bad name"     invalid
-    test_name "bad@name"     invalid
-    test_name "bad.name"     invalid
+    test_name "my-tool"          valid
+    test_name "claude-skill-go"  valid
+    test_name "tool-"            invalid
+    test_name "my--tool"         invalid
+    test_name "MyTool"           invalid
+    test_name "UPPER"            invalid
+    test_name "2bad"             invalid
+    test_name "_bad"             invalid
+    test_name "bad name"         invalid
+    test_name "bad@name"         invalid
+    test_name "bad.name"         invalid
 
     # .mkproj registry tests
     if [[ -f "$PROJECT_DIR/.mkproj" ]]; then
