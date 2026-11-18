@@ -11,8 +11,11 @@ Only missing scaffold files are generated. Live or dirty repositories are refuse
 ## Inputs and options
 
 Names: 1-64 ASCII characters, starting with a lowercase letter and followed by
-lowercase letters, digits, or underscores. Python keywords, uppercase, punctuation,
-whitespace, control characters, Unicode lookalikes, and longer names are rejected.
+lowercase letters, digits, underscores, or hyphens. Hyphens cannot appear at the
+end or consecutively (e.g. `my--tool`). Python source directories under `src/`
+automatically convert hyphens to underscores (`claude-skill-goal` ->
+`src/claude_skill_goal/`). Python keywords, uppercase, punctuation, whitespace,
+control characters, Unicode lookalikes, and longer names are rejected.
 The full target path is limited to 2048 bytes. Invalid input fails before setup.
 
     mkproj --dry-run --agent=none my_tool
@@ -25,6 +28,23 @@ The full target path is limited to 2048 bytes. Invalid input fails before setup.
 Choose one command mode and at most one project name. Duplicate or unknown
 options fail. --test and --help take no additional arguments.
 --doctor takes only an optional name. --agent accepts exactly claude/codex/none.
+
+## Non-interactive usage
+
+To create a project without answering prompts (useful in scripts or CI), pipe
+newlines to accept all defaults. With `--agent=claude --no-global`, only three
+prompts remain (path confirm, bare repo, final proceed) -- all default to yes:
+
+    printf '\n\n\n' | bash /path/to/project-bootstrap/bootstrap.sh \
+        --agent=claude --no-global my-project-name
+
+`--agent=claude` skips the agent selection prompt. `--no-global` skips the global
+shell/hooks prompt. The three remaining prompts all default to yes, so piped
+newlines select each default without manual input.
+
+If `mkproj` is on your PATH:
+
+    printf '\n\n\n' | mkproj --agent=claude --no-global my-project-name
 
 Prompt answers accept one ASCII character. Confirmations accept y/n or Y/N.
 Agent choice accepts 1-3, Claude model choice 1-8, and effort choice 1-4.
