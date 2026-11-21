@@ -1,6 +1,26 @@
 # Changelog
 
-## [3.0.0] - (pending release) -- CRC32(bootstrap.sh) `23d1dae5`
+## [3.0.1] - 2026-11-21 -- CRC32(bootstrap.sh) `766f806a`
+
+### Fixed
+- Replace personal identifier (`/home/pat/`) with generic placeholder in design doc example.
+- Update stale `theitguys` GitHub handle to `BogusException` in bootstrap.sh manpage and impl doc.
+- Remove `--no-index` from `git check-ignore` in `guard_path()` so tracked files inside template
+  `responses/` subdirectories are not blocked by sub-directory `.gitignore` patterns.
+- Fix `.githooks/pre-commit` and `.githooks/pre-push` delegating to old `templates/git-hooks/` path.
+
+### Added
+- `/scan` skill bundled in every new project: checks for absolute paths, personal identifiers,
+  API key patterns, gitignore misses, and email addresses. Reports findings with severity levels.
+
+### Docs
+- All docs updated for v3.0.0 multi-template architecture (template paths, new flags, skills).
+- `overview.md` and `README.md` now have a "non-obvious capabilities" section explaining Git-level
+  guards, update tracking, file tiers, locked access, staged-only auto-commit, and skills.
+- `doc-index.md` updated with entries for skills, `--template`, `--list-templates`, tiers, and
+  new maintenance flags.
+
+## [3.0.0] - 2026-11-21 -- CRC32(bootstrap.sh) `23d1dae5`
 
 ### Breaking changes
 - `templates/` directory restructured into named template folders (`templates/claude-code/`).

@@ -8,7 +8,7 @@ TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
 TEMPLATE_NAME=""    # set in initialize(); empty = prompt user
 TEMPLATE_DIR=""     # set in initialize() after TEMPLATE_NAME is resolved
 MODULE_NAME=""      # derived from PROJECT_NAME (hyphens -> underscores)
-MKPROJ_VERSION="3.0.0"
+MKPROJ_VERSION="3.0.1"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
