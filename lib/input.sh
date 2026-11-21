@@ -40,7 +40,8 @@ parse_args() {
     VERBOSE=false
     FORCE_FILE=""
     ACCEPT_FILE=""
-    local arg mode_seen=false agent_seen=false next_is_force=false next_is_file=false
+    TEMPLATE_NAME=""
+    local arg mode_seen=false agent_seen=false next_is_force=false next_is_file=false next_is_template=false
     for arg in "$@"; do
         # Handle values for --force-file and --file
         if [[ "$next_is_force" == true ]]; then
@@ -53,29 +54,35 @@ parse_args() {
             next_is_file=false
             continue
         fi
+        if [[ "$next_is_template" == true ]]; then
+            TEMPLATE_NAME="$arg"
+            next_is_template=false
+            continue
+        fi
         case "$arg" in
             --help|-h|--usage|--test|--doctor|--dry-run|--update|--scan|--status|\
             --pending|--adopt|--version|--safe-update|--check|--report|--accept|\
-            --restore-infra|--list-tiers)
+            --restore-infra|--list-tiers|--list-templates)
                 [[ "$mode_seen" == false ]] || { err "Choose one command mode."; return 1; }
                 mode_seen=true
                 case "$arg" in
-                    --help|-h|--usage)  MODE=help ;;
-                    --test)             MODE=test ;;
-                    --doctor)           MODE=doctor ;;
-                    --dry-run)          MODE=dry-run ;;
-                    --update)           MODE=update ;;
-                    --scan)             MODE=scan ;;
-                    --status)           MODE=status ;;
-                    --pending)          MODE=pending ;;
-                    --adopt)            MODE=adopt ;;
-                    --version)          MODE=version ;;
-                    --safe-update)      MODE=safe-update ;;
-                    --check)            MODE=check ;;
-                    --report)           MODE=report ;;
-                    --accept)           MODE=accept ;;
-                    --restore-infra)    MODE=restore-infra ;;
-                    --list-tiers)       MODE=list-tiers ;;
+                    --help|-h|--usage)      MODE=help ;;
+                    --test)                 MODE=test ;;
+                    --doctor)               MODE=doctor ;;
+                    --dry-run)              MODE=dry-run ;;
+                    --update)               MODE=update ;;
+                    --scan)                 MODE=scan ;;
+                    --status)               MODE=status ;;
+                    --pending)              MODE=pending ;;
+                    --adopt)                MODE=adopt ;;
+                    --version)              MODE=version ;;
+                    --safe-update)          MODE=safe-update ;;
+                    --check)                MODE=check ;;
+                    --report)               MODE=report ;;
+                    --accept)               MODE=accept ;;
+                    --restore-infra)        MODE=restore-infra ;;
+                    --list-tiers)           MODE=list-tiers ;;
+                    --list-templates)       MODE=list-templates ;;
                 esac ;;
             --agent=claude|--agent=codex|--agent=none)
                 [[ "$agent_seen" == false ]] || { err "Duplicate agent option."; return 1; }
@@ -89,17 +96,20 @@ parse_args() {
             --verbose|-v)    VERBOSE=true ;;
             --force-file)    next_is_force=true ;;
             --file)          next_is_file=true ;;
+            --template)      next_is_template=true ;;
             -*)
                 err "Unknown option: $arg. Use --help."; return 1 ;;
             *)
+                [[ -n "$arg" ]] || { err "Empty argument not allowed."; return 1; }
                 [[ "$HAS_PROJECT_ARG" == false ]] || { err "Only one project name/path is allowed."; return 1; }
                 PROJECT_ARG="$arg"; HAS_PROJECT_ARG=true ;;
         esac
     done
 
     # Handle dangling value flags
-    [[ "$next_is_force" == false ]] || { err "--force-file requires a file path argument."; return 1; }
-    [[ "$next_is_file" == false ]]  || { err "--file requires a file path argument."; return 1; }
+    [[ "$next_is_force" == false ]]    || { err "--force-file requires a file path argument."; return 1; }
+    [[ "$next_is_file" == false ]]     || { err "--file requires a file path argument."; return 1; }
+    [[ "$next_is_template" == false ]] || { err "--template requires a template name argument."; return 1; }
 
     if [[ "$MODE" == help || "$MODE" == test || "$MODE" == version ]]; then
         (( $# == 1 )) || { err "This mode takes no additional arguments."; return 1; }

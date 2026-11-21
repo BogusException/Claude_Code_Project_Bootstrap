@@ -2,6 +2,7 @@
 set -euo pipefail
 is_private_path() {
     case "$1" in
+        templates/*/project/responses/*) return 1 ;;
         responses/*|*/responses/*|backups/*|*/backups/*|.venv/*|*/.venv/*|venv/*|*/venv/*|secrets/*|*/secrets/*|.claude/settings.local.json|*/.claude/settings.local.json|.codex/auth.json|*/.codex/auth.json|.codex/sessions/*|*/.codex/sessions/*|.codex/log/*|*/.codex/log/*|*.pem|*.key|*.p12|*.pfx) return 0 ;;
         .env.example|*/.env.example) return 1 ;;
         .env|*/.env|.env.*|*/.env.*) return 0 ;;
@@ -12,7 +13,7 @@ guard_path() {
     local blocked=false result
     if is_private_path "$1"; then
         blocked=true
-    elif git check-ignore --no-index -q -- "$1"; then
+    elif git check-ignore -q -- "$1"; then
         blocked=true
     else
         result=$?

@@ -32,6 +32,9 @@ logs/
 
 # Claude Code responses (never commit content)
 responses/
+# Allow responses/ skeleton inside templates (the content dirs are gitignored per-project)
+!templates/**/responses/
+!templates/**/responses/**
 
 # Private filesystem backups at any depth
 **/backups/

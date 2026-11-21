@@ -5,8 +5,10 @@ set -euo pipefail
 
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
-MANIFEST_FILE="$BOOTSTRAP_DIR/templates/.mkproj-manifest.json"
-MKPROJ_VERSION="2.1.0"
+TEMPLATE_NAME=""    # set in initialize(); empty = prompt user
+TEMPLATE_DIR=""     # set in initialize() after TEMPLATE_NAME is resolved
+MODULE_NAME=""      # derived from PROJECT_NAME (hyphens -> underscores)
+MKPROJ_VERSION="3.0.0"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
@@ -29,7 +31,6 @@ source "$BOOTSTRAP_DIR/lib/input.sh"
 source "$BOOTSTRAP_DIR/lib/runtime.sh"
 source "$BOOTSTRAP_DIR/lib/registry.sh"
 source "$BOOTSTRAP_DIR/lib/update.sh"
-load_manifest
 CREATED_FILES=()
 TEST_ROOT=""
 TEST_PARENT=""
@@ -306,7 +307,7 @@ cleanup_test() {
 initialize() {
     parse_args "$@"
     CONFIGURE_GLOBAL=false
-    if [[ "$MODE" == help || "$MODE" == version || \
+    if [[ "$MODE" == help || "$MODE" == version || "$MODE" == list-templates || \
           "$MODE" == scan || "$MODE" == status || "$MODE" == pending || \
           "$MODE" == check || "$MODE" == safe-update || "$MODE" == report || \
           "$MODE" == restore-infra || "$MODE" == list-tiers ]]; then return 0; fi
@@ -339,12 +340,28 @@ initialize() {
             PROJECT_NAME="$PROJECT_ARG"
             PROJECT_DIR="$PWD/$PROJECT_NAME"
         fi
+        if [[ "$MODE" == setup || "$MODE" == test ]]; then validate_name "$PROJECT_NAME"; fi
     else
         PROJECT_DIR="$PWD"
         PROJECT_NAME="$(basename "$PROJECT_DIR")"
         if [[ "$MODE" != doctor && "$MODE" != accept ]]; then validate_name "$PROJECT_NAME"; fi
     fi
     validate_project_path "$PROJECT_DIR"
+    # Resolve template (skip for modes that don't create a project)
+    if [[ "$MODE" == setup || "$MODE" == test ]]; then
+        if [[ -z "$TEMPLATE_NAME" ]]; then
+            if [[ "$MODE" == setup && "${YES_MODE:-false}" == false && -t 0 ]]; then
+                TEMPLATE_NAME="$(prompt_template_select)"
+            else
+                TEMPLATE_NAME="$(_default_template_name)"
+            fi
+        fi
+        if [[ ! -d "$TEMPLATES_DIR/$TEMPLATE_NAME" ]]; then
+            err "Template '$TEMPLATE_NAME' not found in $TEMPLATES_DIR"; return 1
+        fi
+        TEMPLATE_DIR="$TEMPLATES_DIR/$TEMPLATE_NAME"
+        MODULE_NAME="${PROJECT_NAME//-/_}"
+    fi
     if [[ "$MODE" == setup && "$LAUNCH_AGENT" != none && -z "${STY:-}" ]]; then
         command -v screen >/dev/null || { err "screen is required for an interactive launch."; return 1; }
         exec screen -S "$PROJECT_NAME" bash -c '"$1" "${@:2}"; status=$?; (( status == 0 )) || exit "$status"; exec bash' bash "$BOOTSTRAP_DIR/bootstrap.sh" "$@"
@@ -416,7 +433,7 @@ phase1_preflight() {
     fi
     log "  Python  : .venv + requirements.txt stub"
     log "  Files   : CLAUDE.md  AGENTS.md  README.md  .gitignore  .env.example  run.sh  test.sh"
-    log "  Claude  : settings.json + $(ls "$TEMPLATES_DIR/hooks"/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks + 4 rules (all from templates/)"
+    log "  Claude  : settings.json + $(find "$TEMPLATE_DIR/claude/hooks" -name '*.sh' 2>/dev/null | wc -l | tr -d ' ') hooks + $(find "$TEMPLATE_DIR/claude/rules" -name '*.md' 2>/dev/null | wc -l | tr -d ' ') rules (from templates/$TEMPLATE_NAME)"
     log "  Dirs    : src/${PROJECT_NAME//-/_}/  tests/  docs/  tasks/  responses/"
     log "  Global  : $CONFIGURE_GLOBAL (verified configuration backups before edits)"
     log "  Launch  : $LAUNCH_AGENT"
@@ -468,7 +485,7 @@ phase3_python() {
     fi
 
     if [[ ! -f "$PROJECT_DIR/requirements.txt" ]]; then
-        cp "$TEMPLATES_DIR/requirements.txt" "$PROJECT_DIR/requirements.txt"
+        cp "$TEMPLATE_DIR/project/requirements.txt" "$PROJECT_DIR/requirements.txt"
         CREATED_FILES+=(requirements.txt)
         log "  Created requirements.txt"
     else
@@ -476,45 +493,120 @@ phase3_python() {
     fi
 }
 
-# ─── Phase 4: Root files ──────────────────────────────────────────────────────
-copy_template() {
-    local src="$TEMPLATES_DIR/$1" dst="$PROJECT_DIR/$2"
-    if [[ -f "$dst" ]]; then
-        log "  exists — $2"
-        return
-    fi
-    mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
-    CREATED_FILES+=("$2")
-    log "  created — $2"
+# ─── Template helpers ─────────────────────────────────────────────────────────
+_default_template_name() {
+    local f="$TEMPLATES_DIR/.default"
+    [[ -f "$f" ]] && tr -d '[:space:]' < "$f" || echo "claude-code"
 }
 
+list_templates() {
+    local def; def="$(_default_template_name)"
+    [[ -d "$TEMPLATES_DIR/$def" ]] && echo "$def"
+    while IFS= read -r -d '' d; do
+        local n; n="$(basename "$d")"
+        [[ "$n" != "$def" ]] && echo "$n"
+    done < <(find "$TEMPLATES_DIR" -mindepth 1 -maxdepth 1 -type d \
+                ! -name 'global' -print0 | sort -z)
+}
+
+prompt_template_select() {
+    local def; def="$(_default_template_name)"
+    local templates=()
+    readarray -t templates < <(list_templates)
+    if (( ${#templates[@]} == 1 )); then
+        echo "${templates[0]}"; return
+    fi
+    printf '\nAvailable templates:\n'
+    local i
+    for (( i=0; i<${#templates[@]}; i++ )); do
+        printf '  %d) %s\n' "$((i+1))" "${templates[$i]}"
+    done
+    local def_idx=1
+    for (( i=0; i<${#templates[@]}; i++ )); do
+        [[ "${templates[$i]}" == "$def" ]] && def_idx=$((i+1)) && break
+    done
+    local choice
+    while true; do
+        printf '\nSelect template [%d - %s]: ' "$def_idx" "${templates[$((def_idx-1))]}"
+        IFS= read -r choice
+        choice="${choice:-$def_idx}"
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#templates[@]} )); then
+            echo "${templates[$((choice-1))]}"; return
+        fi
+        printf 'Invalid. Enter 1-%d.\n' "${#templates[@]}"
+    done
+}
+
+install_project_tree() {
+    local tree="$TEMPLATE_DIR/project"
+    [[ -d "$tree" ]] || { err "Template project tree not found: $tree"; return 1; }
+    while IFS= read -r -d '' src; do
+        local rel="${src#$tree/}"
+        local rel_dst="${rel//\{\{PROJECT_NAME\}\}/$PROJECT_NAME}"
+        rel_dst="${rel_dst//\{\{MODULE_NAME\}\}/$MODULE_NAME}"
+        if [[ "$(basename "$src")" == ".gitkeep" ]]; then
+            mkdir -p "$PROJECT_DIR/$(dirname "$rel_dst")"
+            continue
+        fi
+        local dst="$PROJECT_DIR/$rel_dst"
+        if [[ -f "$dst" ]]; then log "  exists — $rel_dst"; continue; fi
+        mkdir -p "$(dirname "$dst")"
+        sed -e "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" \
+            -e "s/{{MODULE_NAME}}/$MODULE_NAME/g" \
+            "$src" > "$dst"
+        [[ "$src" == *.sh ]] && chmod +x "$dst"
+        CREATED_FILES+=("$rel_dst")
+        log "  created — $rel_dst"
+    done < <(find "$tree" -type f -print0 | sort -z)
+}
+
+install_claude_tree() {
+    local tree="$TEMPLATE_DIR/claude"
+    [[ -d "$tree" ]] || { err "Template claude tree not found: $tree"; return 1; }
+    mkdir -p "$PROJECT_DIR/.claude"
+    while IFS= read -r -d '' src; do
+        local rel="${src#$tree/}"
+        if [[ "$(basename "$src")" == ".gitkeep" ]]; then
+            mkdir -p "$PROJECT_DIR/.claude/$(dirname "$rel")"
+            continue
+        fi
+        local dst="$PROJECT_DIR/.claude/$rel"
+        if [[ -f "$dst" ]]; then log "  exists — .claude/$rel"; continue; fi
+        mkdir -p "$(dirname "$dst")"
+        cp "$src" "$dst"
+        [[ "$src" == *.sh ]] && chmod +x "$dst"
+        CREATED_FILES+=(".claude/$rel")
+        log "  installed — .claude/$rel"
+    done < <(find "$tree" -type f -print0 | sort -z)
+}
+
+install_git_hooks() {
+    local tree="$TEMPLATE_DIR/git-hooks"
+    [[ -d "$tree" ]] || return 0
+    while IFS= read -r -d '' src; do
+        local name; name="$(basename "$src")"
+        [[ "$name" == ".gitkeep" ]] && continue
+        local dst="$PROJECT_DIR/.git/hooks/$name"
+        if [[ -f "$dst" ]]; then log "  exists — .git/hooks/$name"; continue; fi
+        cp "$src" "$dst"
+        chmod +x "$dst"
+        CREATED_FILES+=(".git/hooks/$name")
+        log "  git-hook: $name"
+    done < <(find "$tree" -maxdepth 1 -type f -print0 | sort -z)
+}
+
+# ─── Phase 4: Root files ──────────────────────────────────────────────────────
 phase4_root_files() {
     log "=== Phase 4: Root files ==="
-
-    copy_template ".gitignore"     ".gitignore"
-    copy_template ".gitattributes" ".gitattributes"
-    copy_template ".env.example"   ".env.example"
-
-    for f in CLAUDE.md AGENTS.md README.md; do
-        local dst="$PROJECT_DIR/$f"
-        if [[ ! -f "$dst" ]]; then
-            sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATES_DIR/$f" > "$dst"
-            CREATED_FILES+=("$f")
-            log "  created — $f"
-        else
-            log "  exists — $f"
-        fi
-    done
+    # Handled by install_project_tree() in phase 6
+    :
 }
 
 # ─── Phase 5: Claude Code config ──────────────────────────────────────────────
 phase5_claude_config() {
     log "=== Phase 5: Claude Code config ==="
 
-    mkdir -p "$PROJECT_DIR/.claude/hooks"
-    mkdir -p "$PROJECT_DIR/.claude/rules"
-    mkdir -p "$PROJECT_DIR/.claude/skills"
+    install_claude_tree
 
     # Disable branch protection by default (single-developer workflow)
     if [[ ! -f "$PROJECT_DIR/.claude/protected-branches" ]]; then
@@ -523,36 +615,7 @@ phase5_claude_config() {
         log "  created .claude/protected-branches (branch protection disabled)"
     fi
 
-    # All hooks bundled in templates/hooks/
-    local hook_count=0
-    while IFS= read -r -d '' hook; do
-        local name; name="$(basename "$hook")"
-        local dst="$PROJECT_DIR/.claude/hooks/$name"
-        if [[ ! -f "$dst" ]]; then
-            cp "$hook" "$dst"
-            chmod +x "$dst"
-            CREATED_FILES+=(".claude/hooks/$name")
-            log "  hook: $name"
-            ((hook_count++)) || true
-        fi
-    done < <(find "$TEMPLATES_DIR/hooks" -maxdepth 1 -name "*.sh" -print0 2>/dev/null)
-    [[ $hook_count -eq 0 ]] && log "  all hooks already present — skipping"
-
-    # 4 rules bundled in templates/rules/
-    local rule_count=0
-    while IFS= read -r -d '' rule; do
-        local name; name="$(basename "$rule")"
-        local dst="$PROJECT_DIR/.claude/rules/$name"
-        if [[ ! -f "$dst" ]]; then
-            cp "$rule" "$dst"
-            CREATED_FILES+=(".claude/rules/$name")
-            log "  rule: $name"
-            ((rule_count++)) || true
-        fi
-    done < <(find "$TEMPLATES_DIR/rules" -maxdepth 1 -name "*.md" -print0 2>/dev/null)
-    [[ $rule_count -eq 0 ]] && log "  all rules already present — skipping"
-
-    # settings.json
+    # settings.json is generated dynamically (not a template file)
     if [[ ! -f "$PROJECT_DIR/.claude/settings.json" ]]; then
         generate_settings_json > "$PROJECT_DIR/.claude/settings.json"
         CREATED_FILES+=(.claude/settings.json)
@@ -666,8 +729,9 @@ EOF
 phase6_structure() {
     log "=== Phase 6: Project structure ==="
 
-    # src/<module>/ and tests/
-    local MODULE_NAME="${PROJECT_NAME//-/_}"
+    install_project_tree
+
+    # src/<module>/ requires dynamic MODULE_NAME; create Python package after walker
     if [[ ! -d "$PROJECT_DIR/src/$MODULE_NAME" ]]; then
         mkdir -p "$PROJECT_DIR/src/$MODULE_NAME"
         touch "$PROJECT_DIR/src/$MODULE_NAME/__init__.py"
@@ -676,38 +740,8 @@ phase6_structure() {
     else
         log "  src/$MODULE_NAME/ exists — skipping"
     fi
-    if [[ ! -d "$PROJECT_DIR/tests" ]]; then
-        mkdir -p "$PROJECT_DIR/tests"
-        touch "$PROJECT_DIR/tests/.gitkeep"
-        CREATED_FILES+=(tests/.gitkeep)
-        log "  created tests/"
-    else
-        log "  tests/ exists — skipping"
-    fi
 
-    # Private exchanges and attachments stay entirely outside Git.
-    mkdir -p "$PROJECT_DIR/responses"
-    mkdir -p "$PROJECT_DIR/responses/internal"
     log "  responses/ ready (private, git-ignored)"
-
-    copy_template "tasks/todo.md"            "tasks/todo.md"
-    copy_template "tasks/skills-manifest.md" "tasks/skills-manifest.md"
-
-    for doc in install running api-keys architecture customizing adding-agents privacy-and-security troubleshooting doc-index; do
-        copy_template "docs/$doc.md" "docs/$doc.md"
-    done
-
-    for script in run.sh test.sh; do
-        local dst="$PROJECT_DIR/$script"
-        if [[ ! -f "$dst" ]]; then
-            cp "$TEMPLATES_DIR/$script" "$dst"
-            chmod +x "$dst"
-            CREATED_FILES+=("$script")
-            log "  created $script (executable)"
-        else
-            log "  exists — $script"
-        fi
-    done
 }
 
 # ─── Phase 7: Global setup (idempotent) ───────────────────────────────────────
@@ -728,7 +762,7 @@ phase7_global() {
     fi
     if [[ ! -e "$global_hook" ]]; then
         mkdir -p -- "$(dirname "$global_hook")"
-        cp "$TEMPLATES_DIR/hooks/auto-import-skill.sh" "$global_hook"
+        cp "$TEMPLATE_DIR/claude/hooks/auto-import-skill.sh" "$global_hook"
         chmod u+x "$global_hook"
     fi
     content=""
@@ -776,7 +810,7 @@ BASHRC
     if [[ "$changed" == true ]]; then replace_config "$bashrc" "$content"$'\n'; fi
 
     if [[ "$INSTALL_KEYBINDINGS" == true ]]; then
-        local kb_src="$TEMPLATES_DIR/keybindings.json"
+        local kb_src="$TEMPLATES_DIR/global/keybindings.json"
         local kb_dst="$global_root/.claude/keybindings.json"
         local kb_hash_file="$global_root/.claude/keybindings.json.last-installed-hash"
         local template_hash
@@ -816,9 +850,8 @@ write_registry_initial() {
         disk_hash="$(sha256sum "$PROJECT_DIR/$rel" | cut -d' ' -f1)"
         tier="$(file_tier "$rel")"
         registry_set_file "$PROJECT_DIR" "$rel" "$tpl_hash" "$disk_hash" "installed" "$tier"
-    done < <(find "$TEMPLATES_DIR" -type f \( \
-        ! -path "*/backups/*" ! -name "*.bak" \
-        ! -name ".mkproj-manifest.json" \
+    done < <(find "$TEMPLATE_DIR/project" "$TEMPLATE_DIR/claude" -type f \( \
+        ! -name ".gitkeep" \
         \) -print0)
     if [[ -f "$PROJECT_DIR/.claude/settings.json" ]]; then
         local gen_hash
@@ -1356,6 +1389,7 @@ main() {
         phase9_test_validate
     else
         log "Bootstrap complete: $PROJECT_DIR"
+        printf '\nTip: run /audit in Claude Code once you have a working draft.\n     See docs/skills.md in your new project for details.\n\n'
         flock -u "$LOCK_FD"
         if [[ -n "${BARE_LOCK_FD:-}" ]]; then flock -u "$BARE_LOCK_FD"; fi
         CURRENT_PHASE=launch
@@ -1368,10 +1402,11 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     trap 'status=$?; err "mkproj failed in phase $CURRENT_PHASE (line $LINENO, exit $status). Existing project data and backups are retained."; exit "$status"' ERR
     initialize "$@"
     case "$MODE" in
-        help)    usage ;;
-        version) printf 'mkproj %s\n' "$MKPROJ_VERSION" ;;
-        doctor)  doctor ;;
-        dry-run) dry_run ;;
-        *)       main ;;
+        help)            usage ;;
+        version)         printf 'mkproj %s\n' "$MKPROJ_VERSION" ;;
+        list-templates)  list_templates ;;
+        doctor)          doctor ;;
+        dry-run)         dry_run ;;
+        *)               main ;;
     esac
 fi

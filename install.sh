@@ -149,6 +149,36 @@ fi
 
 install_launcher
 
+# ── Optional: global /audit skill ─────────────────────────────────────────────
+AUDIT_SRC="$BOOTSTRAP_DIR/templates/claude-code/claude/skills/audit.md"
+AUDIT_DST="$HOME/.claude/skills/audit.md"
+if [[ -f "$AUDIT_SRC" && ! -f "$AUDIT_DST" ]]; then
+    echo ""
+    log "Optional: install the /audit skill globally (~/.claude/skills/audit.md)"
+    log "  Adds /audit to every Claude Code project — analyze and prioritize improvements."
+    log "  Press ? then Enter to read the full description first."
+    printf '[install-audit] Install /audit globally? [y/N/?]: '
+    IFS= read -r audit_choice
+    case "$audit_choice" in
+        '?')
+            less "$AUDIT_SRC" || cat "$AUDIT_SRC"
+            printf '[install-audit] Install /audit globally? [y/N]: '
+            IFS= read -r audit_choice
+            ;;
+    esac
+    case "${audit_choice,,}" in
+        y|yes)
+            mkdir -p -- "$(dirname "$AUDIT_DST")"
+            cp "$AUDIT_SRC" "$AUDIT_DST"
+            log "  /audit skill installed: $AUDIT_DST"
+            ;;
+        *)
+            log "  Skipped. You can always copy it manually:"
+            log "    cp $AUDIT_SRC $AUDIT_DST"
+            ;;
+    esac
+fi
+
 # ── PATH check ─────────────────────────────────────────────────────────────────
 if echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
     log "~/bin is in PATH ✓"

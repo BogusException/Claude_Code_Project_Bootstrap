@@ -120,18 +120,16 @@ registry_stamp_from_disk() {
 
 # template_to_project_path TEMPLATE_ABSOLUTE_PATH
 # Maps a template file's absolute path to the project-relative install path.
+# Understands the multi-template tree: <template>/project/, <template>/claude/, <template>/git-hooks/
 template_to_project_path() {
     local abs="$1"
-    local rel="${abs#"$TEMPLATES_DIR/"}"
+    [[ "$(basename "$abs")" != ".gitkeep" ]] || return 0
+    local rel="${abs#"$TEMPLATE_DIR/"}"
     case "$rel" in
-        hooks/*)     printf '.claude/%s\n' "$rel" ;;
-        rules/*)     printf '.claude/%s\n' "$rel" ;;
-        git-hooks/*) printf '.git/hooks/%s\n' "${rel#git-hooks/}" ;;
-        docs/*)      printf '%s\n' "$rel" ;;
-        tasks/*)     printf '%s\n' "$rel" ;;
-        backups/*)              ;;
-        *.bak)                  ;;
-        .mkproj-manifest.json)  ;;
-        *)                      printf '%s\n' "$rel" ;;
+        project/*)        printf '%s\n' "${rel#project/}" ;;
+        claude/hooks/*)   printf '.claude/hooks/%s\n' "$(basename "$abs")" ;;
+        claude/rules/*)   printf '.claude/rules/%s\n' "$(basename "$abs")" ;;
+        claude/skills/*)  printf '.claude/skills/%s\n' "$(basename "$abs")" ;;
+        git-hooks/*)      printf '.githooks/%s\n' "$(basename "$abs")" ;;
     esac
 }

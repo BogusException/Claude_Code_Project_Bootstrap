@@ -105,12 +105,18 @@ configure_git_guards() {
     fi
     for hook in private-paths.sh pre-commit pre-push; do
         if [[ -e "$PROJECT_DIR/.githooks/$hook" ]] &&
-           ! cmp -s "$TEMPLATES_DIR/git-hooks/$hook" "$PROJECT_DIR/.githooks/$hook"; then
+           ! cmp -s "$TEMPLATE_DIR/git-hooks/$hook" "$PROJECT_DIR/.githooks/$hook"; then
             err "Existing custom Git guard retained: $hook"; return 1
         fi
     done
+    mkdir -p "$PROJECT_DIR/.githooks"
     for hook in private-paths.sh pre-commit pre-push; do
-        copy_template "git-hooks/$hook" ".githooks/$hook"
+        local src="$TEMPLATE_DIR/git-hooks/$hook" dst="$PROJECT_DIR/.githooks/$hook"
+        if [[ ! -f "$dst" ]]; then
+            cp "$src" "$dst"
+            CREATED_FILES+=(".githooks/$hook")
+            log "  git-guard: $hook"
+        fi
     done
     chmod +x "$PROJECT_DIR/.githooks/pre-commit" "$PROJECT_DIR/.githooks/pre-push"
     if [[ "$current" != .githooks ]]; then
@@ -126,7 +132,7 @@ verify_privacy_rules() {
         }
     done
     local tracked
-    source "$TEMPLATES_DIR/git-hooks/private-paths.sh"
+    source "$TEMPLATE_DIR/git-hooks/private-paths.sh"
     while IFS= read -r -d '' tracked; do
         if is_private_path "$tracked"; then
             printf 'Private path is already tracked: %q\n' "$tracked" >&2
