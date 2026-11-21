@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.0.0] - (pending release)
+## [3.0.0] - (pending release) -- CRC32(bootstrap.sh) `23d1dae5`
 
 ### Breaking changes
 - `templates/` directory restructured into named template folders (`templates/claude-code/`).
