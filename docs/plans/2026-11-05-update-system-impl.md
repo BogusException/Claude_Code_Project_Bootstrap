@@ -616,7 +616,7 @@ SEE ALSO
        claude(1), codex(1), git(1), screen(1)
 
        Project repository and documentation:
-       https://github.com/theitguys/project-bootstrap
+       https://github.com/BogusException/project-bootstrap
 MANPAGE
 }
 ```

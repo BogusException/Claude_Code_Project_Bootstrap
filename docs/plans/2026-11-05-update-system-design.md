@@ -66,7 +66,7 @@ Each entry in `files` maps a project-relative path to:
 ```
 ─────────────────────────────────────────────────────
   [conflict]  .claude/settings.json
-  Project:    /home/pat/Projects/my-project
+  Project:    /home/user/Projects/my-project
   ─────────
   TEMPLATE (new):
   <first 10 lines of unified diff, truncated if longer>
