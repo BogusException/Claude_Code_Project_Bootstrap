@@ -2,7 +2,7 @@
 
 ## 1. What mkproj installs
 
-`mkproj` copies `templates/keybindings.json` to `~/.claude/keybindings.json` during phase 7 (global setup). The installed bindings:
+`mkproj` copies `templates/global/keybindings.json` to `~/.claude/keybindings.json` during phase 7 (global setup). The installed bindings:
 
 | Key | Context | Action |
 |-----|---------|--------|
@@ -31,6 +31,6 @@ mkproj tracks the SHA-256 of the installed template in `~/.claude/keybindings.js
 
 ## 4. Customizing
 
-Edit `templates/keybindings.json` in this repository. The next `mkproj` run will detect the template change and update any installation that was laid down by mkproj. Files that were hand-edited after a mkproj install will be backed up before replacement.
+Edit `templates/global/keybindings.json` in this repository. The next `mkproj` run will detect the template change and update any installation that was laid down by mkproj. Files that were hand-edited after a mkproj install will be backed up before replacement.
 
 To add bindings without touching the template, edit `~/.claude/keybindings.json` directly. mkproj will not overwrite it as long as the template itself does not change.
