@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.0.2] - 2026-11-21 -- CRC32(bootstrap.sh) `6b68ba14`
+
+### Changed
+- README: two primary commands at the very top, explanatory line, full grouped command reference immediately below.
+- README: added both run modes (parent-dir and adopt-current-dir) with naming rules.
+- README: expanded command reference with all current flags grouped by use case.
+- tasks/todo.md: all v3.0.0 and v3.0.1 tasks checked off; `--prune` logged as deferred feature.
+- .gitignore: added `reference/` to cover private local notes.
+
+### Maintenance
+- Removed duplicate "Release v3.0.0" commit from history via rebase.
+- Retagged v3.0.0 and v3.0.1 to correct post-rebase commits on both remotes.
+
 ## [3.0.1] - 2026-11-21 -- CRC32(bootstrap.sh) `766f806a`
 
 ### Fixed
