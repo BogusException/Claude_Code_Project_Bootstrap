@@ -5,11 +5,19 @@ set -euo pipefail
 
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
+MANIFEST_FILE="$BOOTSTRAP_DIR/templates/.mkproj-manifest.json"
 MKPROJ_VERSION="2.1.0"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
 BARE_REPO=""
+SAFE_MODE=false
+CHECK_MODE=false
+REPORT_MODE=false
+FORCE_FILE=""
+ACCEPT_FILE=""
+RESTORE_INFRA_MODE=false
+LIST_TIERS_MODE=false
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
@@ -21,6 +29,7 @@ source "$BOOTSTRAP_DIR/lib/input.sh"
 source "$BOOTSTRAP_DIR/lib/runtime.sh"
 source "$BOOTSTRAP_DIR/lib/registry.sh"
 source "$BOOTSTRAP_DIR/lib/update.sh"
+load_manifest
 CREATED_FILES=()
 TEST_ROOT=""
 TEST_PARENT=""
@@ -37,7 +46,13 @@ NAME
 
 SYNOPSIS
        mkproj [--no-global] [--agent=claude|codex|none] [--keybindings] [NAME]
-       mkproj --update [NAME]
+       mkproj --update [NAME] [--force-file REL_PATH]
+       mkproj --safe-update [DIR]
+       mkproj --check [DIR]
+       mkproj --report [DIR]
+       mkproj --accept DIR --file REL_PATH
+       mkproj --restore-infra [DIR]
+       mkproj --list-tiers [DIR]
        mkproj --scan [DIR]
        mkproj --status [DIR]
        mkproj --pending [DIR]
@@ -61,8 +76,25 @@ DESCRIPTION
        Files you have edited are left alone. Files where both you and the
        template changed are presented one at a time for a manual decision.
 
-       A file you delete is never reinstalled. Remove its entry from .mkproj
-       if you change your mind.
+       Every tracked file has a tier: directive, infrastructure, or optional.
+       Tiers control how deletions and conflicts are handled. See TIERS below.
+
+FILE TIERS
+       directive
+              Files that directly control agent behavior: CLAUDE.md, AGENTS.md.
+              mkproj never auto-updates these. Deletions are flagged as errors.
+              Conflicts require a human decision. Use --report to get the full
+              picture and --force-file to override after deliberate review.
+
+       infrastructure
+              Hooks, settings, git-hooks, and rules. Safe to auto-update when
+              you have not modified them. Deletions are flagged with a warning
+              and can be restored with --restore-infra.
+
+       optional
+              Docs, task stubs, example files, run/test scripts. If you delete
+              an optional file, mkproj stops tracking it silently and never
+              reinstalls it.
 
 OPTIONS
        --no-global
@@ -83,7 +115,8 @@ OPTIONS
 
        --yes, -y
               Accept all non-conflict updates without prompting. On conflicts,
-              automatically keeps the existing file (safe default).
+              automatically keeps the existing file (safe default). Has no
+              effect on directive conflicts, which always require human review.
 
        --quiet, -q
               Suppress informational output. Errors and conflict prompts are
@@ -92,6 +125,16 @@ OPTIONS
        --verbose, -v
               Show every file decision including up-to-date skips.
 
+       --force-file REL_PATH
+              Force a specific file to be updated from template, even if it is
+              a directive or has user edits. Only valid with --update. Cannot
+              be combined with --yes. The relative path must match the
+              project-relative install path (e.g. CLAUDE.md or
+              .claude/hooks/auto-commit.sh).
+
+       --file REL_PATH
+              Specify a single file for --accept. Required when using --accept.
+
 MODES
        (default)
               Bootstrap a new project in the current directory or NAME.
@@ -99,7 +142,40 @@ MODES
        --update [NAME]
               Update an existing mkproj project. NAME defaults to the current
               directory. Compares every tracked file against its template and
-              applies the decision table (see FILES section).
+              applies the decision table. Respects tier rules: directive files
+              are never silently overwritten.
+
+       --safe-update [DIR]
+              Auto-apply only infrastructure-tier auto_update decisions. Never
+              touches directive files. Never restores deleted optionals. If
+              directive problems exist, prints them and exits non-zero even if
+              safe updates succeeded.
+
+       --check [DIR]
+              Read-only. Walk all tracked files and report:
+                - directive files that are missing or have conflicts  (ERROR)
+                - infrastructure files out of sync or deleted         (WARNING)
+                - optional deleted files are completely silent
+              No writes. Exit 0 if clean, 1 if warnings, 2 if errors.
+
+       --report [DIR]
+              Write mkproj-issues-YYYYMMDD-HHMMSS.md to the project directory.
+              Contains one section per issue with severity, tier, risk summary,
+              and exact commands to fix or accept each file.
+
+       --accept DIR --file REL_PATH
+              Mark a file as "user version accepted" in .mkproj by updating
+              the stored template hash to current. Resolves a conflict without
+              overwriting. This is the "keep mine, stop flagging" operation.
+
+       --restore-infra [DIR]
+              Restore any infrastructure-tier files that were deleted. Does
+              not touch directive or optional files. Always interactive --
+              shows the list before writing. The --yes flag has no effect here.
+
+       --list-tiers [DIR]
+              Print a table of all tracked files with their tier, current
+              status, and last-updated timestamp.
 
        --scan [DIR]
               Recursively find and update all mkproj projects under DIR.
@@ -139,7 +215,11 @@ FILES
        .mkproj
               Per-project identity and file-tracking record. JSON. Gitignored.
               Contains installed mkproj version, install/update timestamps,
-              and per-file hash pairs (template hash + installed hash).
+              and per-file hash pairs (template hash + installed hash + tier).
+
+       templates/.mkproj-manifest.json
+              Declares the tier for every template file. Any file not listed
+              defaults to optional.
 
        ~/.claude/keybindings.json.last-installed-hash
               Hash sidecar for keybindings template tracking. Used only when
@@ -151,9 +231,9 @@ FILES
 
 EXIT STATUS
        0      Success.
-       1      Error. Message written to stderr.
-       2      --status or --scan found projects with pending updates or
-              unresolved conflicts.
+       1      Error or warnings found (--check found warnings only).
+       2      --status, --scan, or --check found errors or projects with
+              pending updates or unresolved conflicts.
 
 ENVIRONMENT
        HOME          Locates ~/.claude/ for global configuration.
@@ -181,6 +261,27 @@ EXAMPLES
        # Update all projects under ~/Projects
        mkproj --scan ~/Projects
 
+       # Check for directive/infrastructure issues without writing
+       mkproj --check ~/Projects/my_app
+
+       # Run safe (infrastructure-only) updates non-interactively
+       mkproj --safe-update ~/Projects/my_app
+
+       # Write a full issue report to the project directory
+       mkproj --report ~/Projects/my_app
+
+       # Force-update a single file (use after reviewing --report)
+       mkproj --update ~/Projects/my_app --force-file CLAUDE.md
+
+       # Accept your version of a file and stop flagging it
+       mkproj --accept ~/Projects/my_app --file .claude/rules/security.md
+
+       # Restore deleted infrastructure files
+       mkproj --restore-infra ~/Projects/my_app
+
+       # Show all tracked files with tiers and status
+       mkproj --list-tiers ~/Projects/my_app
+
        # See what would change without touching anything
        mkproj --status ~/Projects
 
@@ -205,7 +306,10 @@ cleanup_test() {
 initialize() {
     parse_args "$@"
     CONFIGURE_GLOBAL=false
-    if [[ "$MODE" == help || "$MODE" == version || "$MODE" == scan || "$MODE" == status || "$MODE" == pending ]]; then return 0; fi
+    if [[ "$MODE" == help || "$MODE" == version || \
+          "$MODE" == scan || "$MODE" == status || "$MODE" == pending || \
+          "$MODE" == check || "$MODE" == safe-update || "$MODE" == report || \
+          "$MODE" == restore-infra || "$MODE" == list-tiers ]]; then return 0; fi
     if [[ "$MODE" == test ]]; then
         TEST_MODE=true
         unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
@@ -222,12 +326,23 @@ initialize() {
         NO_GLOBAL=true
         trap cleanup_test EXIT
     elif [[ "$HAS_PROJECT_ARG" == true ]]; then
-        PROJECT_NAME="$PROJECT_ARG"
-        PROJECT_DIR="$PWD/$PROJECT_NAME"
+        # accept/adopt/update modes accept a directory path, not just a project name
+        if [[ "$MODE" == accept || "$MODE" == adopt || "$MODE" == update ]]; then
+            if [[ -d "$PROJECT_ARG" ]]; then
+                PROJECT_DIR="$(realpath -- "$PROJECT_ARG")"
+                PROJECT_NAME="$(basename "$PROJECT_DIR")"
+            else
+                PROJECT_NAME="$PROJECT_ARG"
+                PROJECT_DIR="$PWD/$PROJECT_NAME"
+            fi
+        else
+            PROJECT_NAME="$PROJECT_ARG"
+            PROJECT_DIR="$PWD/$PROJECT_NAME"
+        fi
     else
         PROJECT_DIR="$PWD"
         PROJECT_NAME="$(basename "$PROJECT_DIR")"
-        if [[ "$MODE" != doctor ]]; then validate_name "$PROJECT_NAME"; fi
+        if [[ "$MODE" != doctor && "$MODE" != accept ]]; then validate_name "$PROJECT_NAME"; fi
     fi
     validate_project_path "$PROJECT_DIR"
     if [[ "$MODE" == setup && "$LAUNCH_AGENT" != none && -z "${STY:-}" ]]; then
@@ -691,22 +806,25 @@ BASHRC
 write_registry_initial() {
     local components='["core","venv","docs","tasks","hooks","rules","settings"]'
     registry_create "$PROJECT_DIR" "$MKPROJ_VERSION" "$components"
-    local tpl_file rel tpl_hash disk_hash
+    local tpl_file rel tpl_hash disk_hash tier
     while IFS= read -r -d '' tpl_file; do
         rel="$(template_to_project_path "$tpl_file")"
         [[ -n "$rel" ]] || continue
         [[ -f "$PROJECT_DIR/$rel" ]] || continue
         tpl_hash="$(sha256sum "$tpl_file" | cut -d' ' -f1)"
         disk_hash="$(sha256sum "$PROJECT_DIR/$rel" | cut -d' ' -f1)"
-        registry_set_file "$PROJECT_DIR" "$rel" "$tpl_hash" "$disk_hash" "installed"
+        tier="$(file_tier "$rel")"
+        registry_set_file "$PROJECT_DIR" "$rel" "$tpl_hash" "$disk_hash" "installed" "$tier"
     done < <(find "$TEMPLATES_DIR" -type f \( \
         ! -path "*/backups/*" ! -name "*.bak" \
+        ! -name ".mkproj-manifest.json" \
         \) -print0)
     if [[ -f "$PROJECT_DIR/.claude/settings.json" ]]; then
         local gen_hash
         gen_hash="$(generate_settings_json | sha256sum | cut -d' ' -f1)"
         disk_hash="$(sha256sum "$PROJECT_DIR/.claude/settings.json" | cut -d' ' -f1)"
-        registry_set_file "$PROJECT_DIR" ".claude/settings.json" "$gen_hash" "$disk_hash" "installed"
+        tier="$(file_tier ".claude/settings.json")"
+        registry_set_file "$PROJECT_DIR" ".claude/settings.json" "$gen_hash" "$disk_hash" "installed" "$tier"
     fi
     log "  wrote .mkproj"
 }
@@ -996,7 +1114,80 @@ run_update_mode() {
         err "Not a mkproj or Claude Code project: $target"; return 1
     }
     log "Updating: $target"
+
+    if [[ -n "$FORCE_FILE" ]]; then
+        log "  force-updating: $FORCE_FILE"
+        apply_template_file "$target" "$FORCE_FILE"
+        return $?
+    fi
+
     update_project "$target"
+}
+
+run_safe_update_mode() {
+    local target="$SCAN_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || _is_claude_project "$target" || {
+        err "Not a mkproj or Claude Code project: $target"; return 1
+    }
+    log "Safe-update: $target"
+    SAFE_MODE=true update_project "$target"
+}
+
+run_check_mode() {
+    local target="$SCAN_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || {
+        err "Not a mkproj project: $target"; return 1
+    }
+    log "Checking: $target"
+    CHECK_MODE=true check_project "$target"
+}
+
+run_report_mode() {
+    local target="$SCAN_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || {
+        err "Not a mkproj project: $target"; return 1
+    }
+    log "Generating report for: $target"
+    local report_path
+    report_path="$(generate_report "$target")"
+    log "Report written: $report_path"
+}
+
+run_accept_mode() {
+    local target="$PROJECT_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || {
+        err "Not a mkproj project: $target"; return 1
+    }
+    [[ -n "$ACCEPT_FILE" ]] || { err "--accept requires --file REL_PATH."; return 1; }
+    local disk_path="$target/$ACCEPT_FILE"
+    [[ -f "$disk_path" ]] || { err "File does not exist: $disk_path"; return 1; }
+    local tier; tier="$(file_tier "$ACCEPT_FILE")"
+    registry_set_file "$target" "$ACCEPT_FILE" \
+        "$(current_template_hash "$ACCEPT_FILE")" \
+        "$(sha256sum "$disk_path" | cut -d' ' -f1)" "installed" "$tier"
+    log "Accepted: $ACCEPT_FILE (your version is now the baseline)"
+}
+
+run_restore_infra_mode() {
+    local target="$SCAN_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || {
+        err "Not a mkproj project: $target"; return 1
+    }
+    restore_infra "$target"
+}
+
+run_list_tiers_mode() {
+    local target="$SCAN_DIR"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || {
+        err "Not a mkproj project: $target"; return 1
+    }
+    list_tiers "$target"
 }
 
 run_scan_mode() {
@@ -1051,7 +1242,7 @@ run_status_mode() {
             [[ -n "$rel" ]] || continue
             local dec; dec="$(file_update_decision "$d" "$rel")"
             [[ "$dec" == "auto_update" || "$dec" == "conflict" ]] && (( changes++ )) || true
-        done < <(find "$TEMPLATES_DIR" -type f \( ! -path "*/backups/*" ! -name "*.bak" \) -print0)
+        done < <(find "$TEMPLATES_DIR" -type f \( ! -path "*/backups/*" ! -name "*.bak" ! -name ".mkproj-manifest.json" \) -print0)
         (( changes > 0 )) && exit_code=2 || true
         local status_str
         if (( changes == 0 )); then
@@ -1136,11 +1327,17 @@ main() {
         flock -n "$BARE_LOCK_FD" || { err "Another mkproj instance owns the bare destination."; return 1; }
     fi
     case "$MODE" in
-        update)  run_update_mode;  exit $? ;;
-        scan)    run_scan_mode;    exit $? ;;
-        status)  run_status_mode;  exit $? ;;
-        pending) run_pending_mode; exit $? ;;
-        adopt)   run_adopt_mode;   exit $? ;;
+        update)        run_update_mode;        exit $? ;;
+        safe-update)   run_safe_update_mode;   exit $? ;;
+        check)         run_check_mode;         exit $? ;;
+        report)        run_report_mode;        exit $? ;;
+        accept)        run_accept_mode;        exit $? ;;
+        restore-infra) run_restore_infra_mode; exit $? ;;
+        list-tiers)    run_list_tiers_mode;    exit $? ;;
+        scan)          run_scan_mode;          exit $? ;;
+        status)        run_status_mode;        exit $? ;;
+        pending)       run_pending_mode;       exit $? ;;
+        adopt)         run_adopt_mode;         exit $? ;;
     esac
     check_project_repo
     check_repo_destination

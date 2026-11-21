@@ -28,16 +28,41 @@ registry_create() {
         > "$(registry_path "$project_dir")"
 }
 
-# registry_set_file PROJECT_DIR REL_PATH TEMPLATE_HASH INSTALLED_HASH STATUS
+# registry_set_file PROJECT_DIR REL_PATH TEMPLATE_HASH INSTALLED_HASH STATUS [TIER]
 registry_set_file() {
-    local project_dir="$1" rel="$2" th="$3" ih="$4" st="$5"
+    local project_dir="$1" rel="$2" th="$3" ih="$4" st="$5" tier="${6:-}"
     local f; f="$(registry_path "$project_dir")"
     local now; now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     local tmp; tmp="$(mktemp "$(dirname "$f")/.mkproj.XXXXXXXX")"
-    jq --arg p "$rel" --arg th "$th" --arg ih "$ih" --arg st "$st" --arg t "$now" \
-        '.files[$p] = {template_hash:$th, installed_hash:$ih, status:$st}
+    # Resolve tier from manifest if not supplied
+    if [[ -z "$tier" && -n "${MANIFEST_FILE:-}" && -f "$MANIFEST_FILE" ]]; then
+        tier="$(jq -r --arg p "$rel" \
+            '.files[$p].tier // .default_tier // "optional"' "$MANIFEST_FILE")"
+    fi
+    [[ -z "$tier" ]] && tier="optional"
+    jq --arg p "$rel" --arg th "$th" --arg ih "$ih" --arg st "$st" \
+       --arg ti "$tier" --arg t "$now" \
+        '.files[$p] = {template_hash:$th, installed_hash:$ih, status:$st, tier:$ti}
          | .updated_at = $t' "$f" > "$tmp"
     mv -T -- "$tmp" "$f"
+}
+
+# registry_file_tier PROJECT_DIR REL_PATH
+# Reads tier from .mkproj; falls back to manifest; falls back to "optional".
+registry_file_tier() {
+    local project_dir="$1" rel="$2"
+    local stored
+    stored="$(jq -r --arg p "$2" '.files[$p].tier // empty' "$(registry_path "$1")" 2>/dev/null)"
+    if [[ -n "$stored" ]]; then
+        printf '%s\n' "$stored"
+        return
+    fi
+    # Fall back to manifest
+    if [[ -n "${MANIFEST_FILE:-}" && -f "$MANIFEST_FILE" ]]; then
+        jq -r --arg p "$rel" '.files[$p].tier // .default_tier // "optional"' "$MANIFEST_FILE"
+    else
+        printf 'optional\n'
+    fi
 }
 
 # registry_touch_updated PROJECT_DIR
@@ -74,16 +99,22 @@ registry_all_files() {
 registry_stamp_from_disk() {
     local project_dir="$1"
     registry_create "$project_dir" "$MKPROJ_VERSION" '["adopted"]'
-    local tpl_file rel tpl_hash disk_hash
+    local tpl_file rel tpl_hash disk_hash tier
     while IFS= read -r -d '' tpl_file; do
         rel="$(template_to_project_path "$tpl_file")"
         [[ -n "$rel" ]] || continue
         [[ -f "$project_dir/$rel" ]] || continue
         tpl_hash="$(sha256sum "$tpl_file" | cut -d' ' -f1)"
         disk_hash="$(sha256sum "$project_dir/$rel" | cut -d' ' -f1)"
-        registry_set_file "$project_dir" "$rel" "$tpl_hash" "$disk_hash" "installed"
+        tier=""
+        if [[ -n "${MANIFEST_FILE:-}" && -f "$MANIFEST_FILE" ]]; then
+            tier="$(jq -r --arg p "$rel" \
+                '.files[$p].tier // .default_tier // "optional"' "$MANIFEST_FILE")"
+        fi
+        registry_set_file "$project_dir" "$rel" "$tpl_hash" "$disk_hash" "installed" "$tier"
     done < <(find "$TEMPLATES_DIR" -type f \( \
         ! -path "*/backups/*" ! -name "*.bak" \
+        ! -name ".mkproj-manifest.json" \
         \) -print0)
 }
 
@@ -98,8 +129,9 @@ template_to_project_path() {
         git-hooks/*) printf '.git/hooks/%s\n' "${rel#git-hooks/}" ;;
         docs/*)      printf '%s\n' "$rel" ;;
         tasks/*)     printf '%s\n' "$rel" ;;
-        backups/*)   ;;
-        *.bak)       ;;
-        *)           printf '%s\n' "$rel" ;;
+        backups/*)              ;;
+        *.bak)                  ;;
+        .mkproj-manifest.json)  ;;
+        *)                      printf '%s\n' "$rel" ;;
     esac
 }
