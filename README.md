@@ -6,6 +6,16 @@ hooks, shared CLAUDE.md instructions, and an AGENTS.md pointer for Codex.
     mkproj my_tool    # run from a parent directory -- creates the folder
     mkproj            # run from inside an empty directory -- adopts the folder name
 
+    # From a parent directory -- mkproj creates the folder
+    cd ~/Projects && mkproj my_tool
+
+    # From inside an existing empty directory -- folder name is adopted
+    mkdir ~/Projects/my_tool && cd ~/Projects/my_tool && mkproj
+
+Bootstrap refuses real project commits, dirty tracked files, staged changes,
+nested repositories, detached HEAD, conflicting origins, and unrelated
+bare-repository destinations.
+
 A lot more is possible. Some of what's available:
 
 ## Commands
