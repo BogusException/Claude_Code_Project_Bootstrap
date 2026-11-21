@@ -74,20 +74,6 @@ Names: 1-64 lowercase letters/digits/underscores/hyphens, starting with a letter
 No trailing or consecutive hyphens. No Python keywords. When adopting a directory,
 the folder name is validated by the same rules.
 
----
-
-## Two ways to run it
-
-    # From a parent directory -- mkproj creates the folder
-    cd ~/Projects && mkproj my_tool
-
-    # From inside an existing empty directory -- folder name is adopted
-    mkdir ~/Projects/my_tool && cd ~/Projects/my_tool && mkproj
-
-Bootstrap refuses real project commits, dirty tracked files, staged changes,
-nested repositories, detached HEAD, conflicting origins, and unrelated
-bare-repository destinations.
-
 ## What goes beyond "copy files and make folders"
 
 **Safety guards at the Git level.** Two native Git hooks (`.githooks/pre-commit` and `.githooks/pre-push`) enforce privacy rules before any commit or push reaches the index. They check both explicit path patterns (`responses/`, `*.pem`, `.env.*`, etc.) and git's own ignore rules -- so private files cannot slip through even if the agent is bypassed.
@@ -149,7 +135,7 @@ screen is needed for interactive screen launch; the selected agent must be insta
 The installer supports apt-based Linux systems. Windows compatibility is deferred.
 
     bash install.sh --check
-    bash install.sh
+    bash install.sh       # writes mkproj to ~/bin/mkproj
 
 Edit `templates/claude-code/` for future projects. Behavioral rules belong in
 `templates/claude-code/project/CLAUDE.md`; `templates/claude-code/project/AGENTS.md`
