@@ -3,6 +3,11 @@
 mkproj scaffolds Linux Python projects with Git, a project `.venv`, Claude Code
 hooks, shared CLAUDE.md instructions, and an AGENTS.md pointer for Codex.
 
+    mkproj my_tool    # run from a parent directory -- creates the folder
+    mkproj            # run from inside an empty directory -- adopts the folder name
+
+A lot more is possible. Some of what's available:
+
 ## Commands
 
 **Create a project**
