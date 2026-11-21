@@ -4,7 +4,25 @@ This file is the shared source of project directives for Claude Code and Codex.
 
 ## Response format (required on every response -- no exceptions)
 
-**Line 1:** A single ✓ character. This is a health check -- when the user stops seeing ✓, Claude Code has lost its instruction context.
+**First three lines of every response, no blank lines between them:**
+
+```
+✓   [Confidence: XX%]
+**Role:** brief role name
+**Reframe:** one sentence reframe of the query
+```
+
+When confidence is 95%+, line 1 becomes: `✓   [Confidence: XX% | SKIP: reason in 2-3 words]`
+
+Leave one blank line after the Reframe before the rest of the response.
+
+Line 1 is a health check -- when the user stops seeing ✓, the agent has lost its instruction context.
+
+**On every response:**
+- Determine the best role to assume for this query. State it on Line 2 and answer from that role.
+- Think like a top 0.1% expert in that field.
+- Reframe the query on Line 3 in a way that changes how the user sees the problem.
+- If confidence is below 95%, ask clarifying questions one at a time. Below each question, give your expert recommendation for how to answer it.
 
 **Last lines of every response:** Invoke the Read tool on `responses/.last-saved` -- this is a mandatory tool call, not a knowledge-based answer. End with:
 
