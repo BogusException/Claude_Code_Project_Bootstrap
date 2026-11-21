@@ -687,6 +687,7 @@ phase6_structure() {
 
     # Private exchanges and attachments stay entirely outside Git.
     mkdir -p "$PROJECT_DIR/responses"
+    mkdir -p "$PROJECT_DIR/responses/internal"
     log "  responses/ ready (private, git-ignored)"
 
     copy_template "tasks/todo.md"            "tasks/todo.md"
