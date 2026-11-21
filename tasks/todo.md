@@ -10,51 +10,58 @@ copier. New interactive template selection prompt at mkproj run time.
 
 ## Tasks
 
-- [ ] 1. Create CHANGELOG.md with history back-filled from git log
-- [ ] 2. Create release.sh (read VERSION, verify tag, run tests, stamp CRC, commit, push, gh release)
-- [ ] 3. Create RELEASING.md pre-flight checklist
-- [ ] 4. Reorganize templates/ into new tree:
+- [x] 1. Create CHANGELOG.md with history back-filled from git log
+- [x] 2. Create release.sh (read VERSION, verify tag, run tests, stamp CRC, commit, push, gh release)
+- [x] 3. Create RELEASING.md pre-flight checklist
+- [x] 4. Reorganize templates/ into new tree:
         templates/.default  (contains "claude-code")
         templates/global/   (keybindings.json -- installed globally, not per-project)
         templates/claude-code/project/   (full project root mirror, empty dirs get .gitkeep)
         templates/claude-code/claude/    (hooks/, rules/, skills/, settings.json)
         templates/claude-code/git-hooks/ (pre-commit, pre-push, private-paths.sh)
-        Drop all backups/ subdirectories inside templates/ (edit artifacts, not content)
-- [ ] 5. Add /audit SKILL.md to templates/claude-code/claude/skills/
-- [ ] 6. Add docs/skills.md to templates/claude-code/project/docs/ explaining /audit
-- [ ] 7. Rewrite bootstrap.sh template-install phases:
-        - read_template_name(): reads .default, respects --template flag
-        - install_project_tree(): walks project/ and copies to PROJECT_DIR, substituting macros
-        - install_claude_tree(): walks claude/ and installs into .claude/
-        - install_git_hooks(): walks git-hooks/ and installs into .git/hooks/
-        - install_global(): installs templates/global/ items (keybindings.json) with existing logic
-        - Remove all scattered mkdir -p and copy_template calls replaced by walkers
-- [ ] 8. Add interactive template selection to lib/input.sh:
-        - list_templates(): scans templates/, reads .default, sorts default first
-        - prompt_template_select(): numbered list, [N - name] bracket, Enter accepts default
-        - --template NAME flag: skip prompt, validate name exists
-        - --list-templates flag: print list and exit
-- [ ] 9. Add end-of-mkproj tip line pointing to /audit and docs/skills.md
-- [ ] 10. Add global /audit install option to install.sh (opt-in, [Y/n] prompt with ? for less view)
-- [ ] 11. Bump MKPROJ_VERSION to 3.0.0
-- [ ] 12. Run full test suite -- fix any failures before continuing
-- [ ] 13. Stamp CHANGELOG, commit "Release v3.0.0", push, gh release create
+- [x] 5. Add /audit SKILL.md to templates/claude-code/claude/skills/
+- [x] 6. Add docs/skills.md to templates/claude-code/project/docs/ explaining /audit
+- [x] 7. Rewrite bootstrap.sh template-install phases (tree-walkers, macro substitution)
+- [x] 8. Add interactive template selection to lib/input.sh (--template, --list-templates)
+- [x] 9. Add end-of-mkproj tip line pointing to /audit and docs/skills.md
+- [x] 10. Add global /audit install option to install.sh (opt-in, [Y/n] prompt)
+- [x] 11. Bump MKPROJ_VERSION to 3.0.0
+- [x] 12. Run full test suite -- all checks passed
+- [x] 13. Stamp CHANGELOG, commit "Release v3.0.0", push, gh release create
 
-## Deferred from v2.0.0 (carry forward)
+## Post-release (v3.0.1)
 
+- [x] Fix guard_path() --no-index blocking tracked template responses files
+- [x] Fix .githooks/pre-commit and pre-push delegating to old templates/git-hooks/ path
+- [x] Replace personal identifier /home/pat/ with /home/user/ in design doc example
+- [x] Update stale theitguys GitHub handle to BogusException throughout
+- [x] Add /scan skill to template (privacy and secrets scan)
+- [x] Rewrite all docs for v3.0.0 multi-template architecture
+- [x] Add non-obvious capabilities overview to README and overview.md
+- [x] Rewrite git history: replace noreply@anthropic.com with claude@anthropic.invalid
+- [x] Update ~/.claude/CLAUDE.md: use claude@anthropic.invalid for all future attribution
+- [x] Mark tasks/todo.md complete, log --prune as deferred feature
+
+## Deferred (v3.x)
+
+- [ ] `mkproj --prune` -- detect and offer to delete optional template files that have never
+      been modified since install (current_hash == installed_hash AND tier == optional).
+      Uses existing .mkproj registry hashes; no content scanning needed. Interactive by default,
+      --yes for non-interactive. Leaves folders intact (they may be waiting for content).
 - [ ] `--update --components=hooks,rules` selective component updates
 - [ ] `--max-depth N` for scan depth control
 - [ ] `--force` flag (requires audit trail before overwriting user edits)
 - [ ] Component-level options in `--adopt`
 - [ ] `--json` machine-readable output for scripting
 - [ ] `mkproj --init` alias for the default bootstrap mode
-- [ ] Windows native support (WSL2 recommended in the interim)
 - [ ] `mkproj --diff NAME` -- show pending changes without updating
+- [ ] Windows native support (WSL2 recommended in the interim)
 
-## Validation baseline
+## Validation baseline (v3.0.1)
 
-182 input/boundary/no-side-effect checks and 27 Linux regression tests pass.
-The regression suite includes the isolated full scaffold test, forced private
-staging, private history later deleted, push failure, backup failure, launcher
-failure, collision/ref preservation, archive collisions, and venv switching.
+187 input/boundary/no-side-effect checks and regression tests pass.
+Suite covers: isolated full scaffold test, forced private staging, private history
+later deleted, push failure, backup failure, launcher failure, collision/ref
+preservation, archive collisions, venv switching, name validation (valid/invalid),
+.mkproj creation and version check, --version output.
 Bash syntax and git diff whitespace checks pass.

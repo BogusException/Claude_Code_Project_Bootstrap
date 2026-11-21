@@ -3,13 +3,75 @@
 mkproj scaffolds Linux Python projects with Git, a project `.venv`, Claude Code
 hooks, shared CLAUDE.md instructions, and an AGENTS.md pointer for Codex.
 
-Run from a parent directory:
+## Commands
 
-    mkproj my_tool
+**Create a project**
 
-Or run mkproj inside an existing empty project directory. Bootstrap refuses
-real project commits, dirty tracked files, staged changes, nested repositories,
-detached HEAD, conflicting origins, and unrelated bare-repository destinations.
+    mkproj my_tool                         # create project in a new folder
+    mkproj                                 # adopt current directory name as project name
+    mkproj --agent=claude my_tool          # scaffold and launch Claude Code (default)
+    mkproj --agent=codex my_tool           # scaffold and launch Codex
+    mkproj --agent=none my_tool            # scaffold only, no agent launch
+    mkproj --no-global my_tool             # skip global shell/hook configuration
+    mkproj --keybindings my_tool           # install managed terminal keybindings
+    mkproj --template claude-code my_tool  # use a specific named template
+    mkproj --dry-run my_tool               # show what would happen, touch nothing
+
+**Templates**
+
+    mkproj --list-templates                # print available templates and exit
+
+**Diagnostics**
+
+    mkproj --help
+    mkproj --version
+    mkproj --doctor                        # check prerequisites and project health
+    mkproj --test                          # run full isolated scaffold test (no side effects)
+
+**Update a project**
+
+    mkproj --update                        # update current project from latest template
+    mkproj --safe-update                   # update only optional files, skip directives/infra
+    mkproj --force-file PATH               # force-update a single file, bypassing conflict skip
+
+**Manage multiple projects**
+
+    mkproj --scan ~/Projects               # update all mkproj projects under a directory
+    mkproj --status ~/Projects             # dry-run scan: show what would change, touch nothing
+    mkproj --pending ~/Projects            # interactively resolve all deferred conflicts
+
+**Enroll an existing project**
+
+    mkproj --adopt                         # enroll an existing Claude Code project in mkproj
+
+**File tier audit**
+
+    mkproj --check ~/Projects              # audit tier compliance, exit 1 if issues found
+    mkproj --report ~/Projects             # print tier report, touch nothing
+    mkproj --list-tiers                    # show each tracked file and its tier
+    mkproj --restore-infra                 # reinstate deleted or corrupted infrastructure files
+
+**Conflict resolution**
+
+    mkproj --accept --file PATH            # accept the template version of a conflicted file
+
+Names: 1-64 lowercase letters/digits/underscores/hyphens, starting with a letter.
+No trailing or consecutive hyphens. No Python keywords. When adopting a directory,
+the folder name is validated by the same rules.
+
+---
+
+## Two ways to run it
+
+    # From a parent directory -- mkproj creates the folder
+    cd ~/Projects && mkproj my_tool
+
+    # From inside an existing empty directory -- folder name is adopted
+    mkdir ~/Projects/my_tool && cd ~/Projects/my_tool && mkproj
+
+Bootstrap refuses real project commits, dirty tracked files, staged changes,
+nested repositories, detached HEAD, conflicting origins, and unrelated
+bare-repository destinations.
 
 ## What goes beyond "copy files and make folders"
 
@@ -28,33 +90,6 @@ detached HEAD, conflicting origins, and unrelated bare-repository destinations.
 **Skills in every project.** New projects receive `/audit` (proactive improvement review) and `/scan` (privacy and secrets check) as Claude Code skills ready to invoke on day one.
 
 **Non-interactive mode.** `--agent=claude --no-global` plus three piped newlines skips all prompts -- usable in CI or remote provisioning.
-
-## Commands
-
-    mkproj --help
-    mkproj --version
-    mkproj --dry-run --agent=none my_tool
-    mkproj --doctor
-    mkproj --test
-    mkproj --no-global --agent=codex my_tool
-    mkproj --no-global --agent=none my_tool
-    mkproj --keybindings my_tool
-    mkproj --list-templates
-    mkproj --template claude-code my_tool
-
-    # Update and maintenance
-    mkproj --update                   # update current project
-    mkproj --scan ~/Projects          # update all projects under a directory
-    mkproj --status ~/Projects        # dry-run: show what would change
-    mkproj --pending ~/Projects       # resolve all deferred conflict decisions
-    mkproj --adopt                    # enroll an existing Claude Code project
-    mkproj --check ~/Projects         # audit file tier compliance
-    mkproj --report ~/Projects        # print tier report without changing anything
-    mkproj --restore-infra            # reinstate deleted/corrupted infrastructure files
-
-Names are 1-64 lowercase ASCII letters/digits/underscores/hyphens, beginning with
-a letter. Python keywords are refused; the full project path is limited to 2048 bytes.
-Malformed answers reprompt, and EOF aborts.
 
 ## Linux workflow
 
