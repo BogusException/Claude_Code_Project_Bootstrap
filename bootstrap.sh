@@ -46,23 +46,26 @@ NAME
        mkproj - bootstrap and maintain Claude Code Python projects
 
 SYNOPSIS
-       mkproj [--no-global] [--agent=claude|codex|none] [--keybindings] [NAME]
-       mkproj --update [NAME] [--force-file REL_PATH]
-       mkproj --safe-update [DIR]
-       mkproj --check [DIR]
-       mkproj --report [DIR]
-       mkproj --accept DIR --file REL_PATH
-       mkproj --restore-infra [DIR]
-       mkproj --list-tiers [DIR]
-       mkproj --scan [DIR]
-       mkproj --status [DIR]
-       mkproj --pending [DIR]
-       mkproj --adopt [NAME]
-       mkproj --dry-run [--no-global] [--agent=claude|codex|none] [NAME]
-       mkproj --doctor [NAME]
-       mkproj --test
-       mkproj --version
-       mkproj --help
+       mkproj [--no-global] [--agent=claude|codex|none] [--keybindings] NAME
+       mkproj update  [DIR] [--force-file REL_PATH]
+       mkproj update  [DIR] --safe
+       mkproj check   [DIR]
+       mkproj report  [DIR]
+       mkproj accept  DIR --file REL_PATH
+       mkproj restore [DIR]
+       mkproj tiers   [DIR]
+       mkproj scan    [DIR]
+       mkproj status  [DIR]
+       mkproj pending [DIR]
+       mkproj adopt   [NAME]
+       mkproj preview [--no-global] [--agent=claude|codex|none] [NAME]
+       mkproj diagnose [NAME]
+       mkproj test
+       mkproj version
+       mkproj help
+
+       All commands also accept the legacy --option form (--update, --check,
+       --scan, --doctor, --dry-run, etc.) for backward compatibility.
 
 DESCRIPTION
        mkproj bootstraps a complete Claude Code Python project from an empty
@@ -110,9 +113,14 @@ OPTIONS
               Default: off. Keybindings are personal; use this flag only on
               machines where you want the managed defaults.
 
+       --safe
+              Apply only infrastructure-tier auto-updates. Never touches
+              directive files. Only valid with the update command.
+              Equivalent to the legacy --safe-update mode.
+
        --dry-run
-              Show what would be created or changed without writing anything.
-              Works with the default setup mode.
+              Alias for the preview command. Show what would be created or
+              changed without writing anything.
 
        --yes, -y
               Accept all non-conflict updates without prompting. On conflicts,
@@ -140,77 +148,82 @@ MODES
        (default)
               Bootstrap a new project in the current directory or NAME.
 
-       --update [NAME]
-              Update an existing mkproj project. NAME defaults to the current
+       update [DIR] [--force-file REL_PATH]
+              Update an existing mkproj project. DIR defaults to the current
               directory. Compares every tracked file against its template and
               applies the decision table. Respects tier rules: directive files
               are never silently overwritten.
 
-       --safe-update [DIR]
-              Auto-apply only infrastructure-tier auto_update decisions. Never
+       update [DIR] --safe
+              Apply only infrastructure-tier auto-update decisions. Never
               touches directive files. Never restores deleted optionals. If
               directive problems exist, prints them and exits non-zero even if
-              safe updates succeeded.
+              infrastructure updates succeeded.
 
-       --check [DIR]
+       check [DIR]
               Read-only. Walk all tracked files and report:
                 - directive files that are missing or have conflicts  (ERROR)
                 - infrastructure files out of sync or deleted         (WARNING)
                 - optional deleted files are completely silent
               No writes. Exit 0 if clean, 1 if warnings, 2 if errors.
 
-       --report [DIR]
+       report [DIR]
               Write mkproj-issues-YYYYMMDD-HHMMSS.md to the project directory.
               Contains one section per issue with severity, tier, risk summary,
               and exact commands to fix or accept each file.
 
-       --accept DIR --file REL_PATH
+       accept DIR --file REL_PATH
               Mark a file as "user version accepted" in .mkproj by updating
               the stored template hash to current. Resolves a conflict without
               overwriting. This is the "keep mine, stop flagging" operation.
 
-       --restore-infra [DIR]
+       restore [DIR]
               Restore any infrastructure-tier files that were deleted. Does
               not touch directive or optional files. Always interactive --
               shows the list before writing. The --yes flag has no effect here.
 
-       --list-tiers [DIR]
+       tiers [DIR]
               Print a table of all tracked files with their tier, current
               status, and last-updated timestamp.
 
-       --scan [DIR]
+       scan [DIR]
               Recursively find and update all mkproj projects under DIR.
               DIR defaults to the current directory. Skips .git/, .venv/,
               node_modules/, and __pycache__/. Presents non-managed Claude
               Code projects separately and offers to adopt them.
 
-       --status [DIR]
-              Dry-run scan: print one line per project showing its installed
+       status [DIR]
+              Read-only scan: print one line per project showing its installed
               mkproj version vs the current tool version and a file change
               summary. No files are written. Exit code 2 if any project has
               pending updates or conflicts.
 
-       --pending [DIR]
+       pending [DIR]
               Find all deferred decisions across projects under DIR and
               present them interactively one by one.
 
-       --adopt [NAME]
+       adopt [NAME]
               Enroll an existing Claude Code project (one with .claude/ or
               CLAUDE.md but no .mkproj) into mkproj management. Only adds
               missing files; never modifies existing ones. Creates .mkproj
               recording the current state.
 
-       --doctor [NAME]
-              Read-only diagnostics: check environment and project health
-              without changing anything.
+       preview [--no-global] [--agent=claude|codex|none] [NAME]
+              Show what would be created or changed without writing anything.
 
-       --test Isolated end-to-end scaffold and negative tests. No global
+       diagnose [NAME]
+              Read-only diagnostics: check environment and project health
+              without changing anything. Reports missing dependencies, broken
+              Git guards, and venv issues with the source of each problem
+              identified.
+
+       test   Isolated end-to-end scaffold and negative tests. No global
               changes or pushes.
 
-       --version
+       version
               Print mkproj version and exit.
 
-       --help Print this page and exit.
+       help   Print this page and exit.
 
 FILES
        .mkproj
@@ -257,40 +270,43 @@ EXAMPLES
        mkproj --keybindings my_app
 
        # Update a single project
-       cd ~/Projects/my_app && mkproj --update
+       cd ~/Projects/my_app && mkproj update
 
        # Update all projects under ~/Projects
-       mkproj --scan ~/Projects
+       mkproj scan ~/Projects
 
        # Check for directive/infrastructure issues without writing
-       mkproj --check ~/Projects/my_app
+       mkproj check ~/Projects/my_app
 
        # Run safe (infrastructure-only) updates non-interactively
-       mkproj --safe-update ~/Projects/my_app
+       mkproj update ~/Projects/my_app --safe --yes
 
        # Write a full issue report to the project directory
-       mkproj --report ~/Projects/my_app
+       mkproj report ~/Projects/my_app
 
-       # Force-update a single file (use after reviewing --report)
-       mkproj --update ~/Projects/my_app --force-file CLAUDE.md
+       # Force-update a single file (use after reviewing report output)
+       mkproj update ~/Projects/my_app --force-file CLAUDE.md
 
        # Accept your version of a file and stop flagging it
-       mkproj --accept ~/Projects/my_app --file .claude/rules/security.md
+       mkproj accept ~/Projects/my_app --file .claude/rules/security.md
 
        # Restore deleted infrastructure files
-       mkproj --restore-infra ~/Projects/my_app
+       mkproj restore ~/Projects/my_app
 
        # Show all tracked files with tiers and status
-       mkproj --list-tiers ~/Projects/my_app
+       mkproj tiers ~/Projects/my_app
 
        # See what would change without touching anything
-       mkproj --status ~/Projects
+       mkproj status ~/Projects
+
+       # Check environment and project health
+       mkproj diagnose ~/Projects/my_app
 
        # Enroll an existing project
-       cd ~/Projects/legacy_project && mkproj --adopt
+       cd ~/Projects/legacy_project && mkproj adopt
 
        # Non-interactive update (keep all conflicts)
-       mkproj --scan ~/Projects --yes --quiet
+       mkproj scan ~/Projects --yes --quiet
 
 SEE ALSO
        claude(1), codex(1), git(1), screen(1)

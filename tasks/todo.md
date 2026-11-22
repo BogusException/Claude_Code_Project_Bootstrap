@@ -56,6 +56,19 @@ copier. New interactive template selection prompt at mkproj run time.
 - [ ] `mkproj --init` alias for the default bootstrap mode
 - [ ] `mkproj --diff NAME` -- show pending changes without updating
 - [ ] Windows native support (WSL2 recommended in the interim)
+- [ ] `mkproj diagnose` hook diagnostic: enumerate all hooks in ~/.claude/settings.json
+      (global + project), run each with a hard timeout, record exit code/duration/stderr,
+      label each result as PB-owned / user-defined / third-party plugin, and produce a
+      plain-text report. Example output: "Stop hook 2/6: mempalace hook run -- TIMED OUT
+      (10s) -- source: global settings.json, not PB." The claude-mem bun-runner (exit 1,
+      52ms) is the reference test case to validate against.
+- [ ] Move configurable timeouts out of hardcoded values and into a config file (e.g.
+      mkproj.conf or a [timeouts] section in .mkproj). Timeouts appropriate for a fast
+      local machine may be too tight on a slow system or over a network mount.
+- [ ] Dynamic timeout suggestions: when `mkproj diagnose` observes a timeout, suggest a
+      concrete config change to the user based on the observed duration. Example: "hook
+      took 8.2s before timeout -- consider raising hook_timeout_stop to 15 in mkproj.conf."
+      Avoids static "try increasing the timeout" advice that ignores actual performance.
 
 ## Validation baseline (v3.0.1)
 

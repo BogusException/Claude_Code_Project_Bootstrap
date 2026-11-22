@@ -38,10 +38,34 @@ parse_args() {
     YES_MODE=false
     QUIET=false
     VERBOSE=false
+    SAFE_MODE=false
     FORCE_FILE=""
     ACCEPT_FILE=""
     TEMPLATE_NAME=""
     local arg mode_seen=false agent_seen=false next_is_force=false next_is_file=false next_is_template=false
+
+    # Accept bare command words as the first arg (e.g. mkproj update DIR).
+    # Normalize to the --option form so the rest of the loop is unchanged.
+    if [[ $# -gt 0 && "$1" != -* ]]; then
+        case "$1" in
+            update)   set -- --update        "${@:2}" ;;
+            check)    set -- --check         "${@:2}" ;;
+            report)   set -- --report        "${@:2}" ;;
+            accept)   set -- --accept        "${@:2}" ;;
+            scan)     set -- --scan          "${@:2}" ;;
+            status)   set -- --status        "${@:2}" ;;
+            pending)  set -- --pending       "${@:2}" ;;
+            adopt)    set -- --adopt         "${@:2}" ;;
+            restore)  set -- --restore-infra "${@:2}" ;;
+            tiers)    set -- --list-tiers    "${@:2}" ;;
+            test)     set -- --test          "${@:2}" ;;
+            diagnose) set -- --doctor        "${@:2}" ;;
+            preview)  set -- --dry-run       "${@:2}" ;;
+            version)  set -- --version       "${@:2}" ;;
+            help)     set -- --help          "${@:2}" ;;
+        esac
+    fi
+
     for arg in "$@"; do
         # Handle values for --force-file and --file
         if [[ "$next_is_force" == true ]]; then
@@ -60,7 +84,7 @@ parse_args() {
             continue
         fi
         case "$arg" in
-            --help|-h|--usage|--test|--doctor|--dry-run|--update|--scan|--status|\
+            --help|-h|--usage|--test|--doctor|--diagnose|--dry-run|--update|--scan|--status|\
             --pending|--adopt|--version|--safe-update|--check|--report|--accept|\
             --restore-infra|--list-tiers|--list-templates)
                 [[ "$mode_seen" == false ]] || { err "Choose one command mode."; return 1; }
@@ -68,7 +92,7 @@ parse_args() {
                 case "$arg" in
                     --help|-h|--usage)      MODE=help ;;
                     --test)                 MODE=test ;;
-                    --doctor)               MODE=doctor ;;
+                    --doctor|--diagnose)     MODE=doctor ;;
                     --dry-run)              MODE=dry-run ;;
                     --update)               MODE=update ;;
                     --scan)                 MODE=scan ;;
@@ -94,6 +118,7 @@ parse_args() {
             --yes|-y)        YES_MODE=true ;;
             --quiet|-q)      QUIET=true ;;
             --verbose|-v)    VERBOSE=true ;;
+            --safe)          SAFE_MODE=true ;;
             --force-file)    next_is_force=true ;;
             --file)          next_is_file=true ;;
             --template)      next_is_template=true ;;
@@ -115,7 +140,7 @@ parse_args() {
         (( $# == 1 )) || { err "This mode takes no additional arguments."; return 1; }
     fi
     if [[ "$MODE" == doctor && ( "$agent_seen" == true || "$NO_GLOBAL" == true ) ]]; then
-        err "--doctor takes only an optional project name."; return 1
+        err "diagnose takes only an optional project name."; return 1
     fi
     if [[ -n "$FORCE_FILE" && "$MODE" != update ]]; then
         err "--force-file is only valid with --update."; return 1
@@ -125,6 +150,11 @@ parse_args() {
     fi
     if [[ "$MODE" == accept && -z "$ACCEPT_FILE" ]]; then
         err "--accept requires --file REL_PATH."; return 1
+    fi
+
+    # Translate update --safe into safe-update mode
+    if [[ "$MODE" == update && "$SAFE_MODE" == true ]]; then
+        MODE=safe-update
     fi
 
     # scan/status/pending/check/safe-update/report/restore-infra/list-tiers
