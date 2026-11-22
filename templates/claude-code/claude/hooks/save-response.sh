@@ -16,16 +16,19 @@ query=payload.get("prompt","")
 transcript=payload.get("transcript_path","")
 if transcript:
     with open(transcript,encoding="utf-8") as stream:
-        for line in stream:
-            try: entry=json.loads(line)
-            except json.JSONDecodeError: continue
-            msg=entry.get("message",{})
-            if msg.get("role")!="user": continue
-            content=msg.get("content","")
-            if isinstance(content,str) and content.strip(): query=content.strip()
-            elif isinstance(content,list):
-                texts=[b["text"] for b in content if isinstance(b,dict) and b.get("type")=="text" and isinstance(b.get("text"),str) and b["text"].strip()]
-                if texts: query="\n".join(texts)
+        lines=stream.readlines()
+    for line in reversed(lines):
+        if not line.strip(): continue
+        try: entry=json.loads(line)
+        except json.JSONDecodeError: continue
+        msg=entry.get("message",{})
+        if msg.get("role")!="user": continue
+        content=msg.get("content","")
+        if isinstance(content,str) and content.strip():
+            query=content.strip(); break
+        elif isinstance(content,list):
+            texts=[b["text"] for b in content if isinstance(b,dict) and b.get("type")=="text" and isinstance(b.get("text"),str) and b["text"].strip()]
+            if texts: query="\n".join(texts); break
 if not isinstance(query,str) or not query.strip():
     raise ValueError("Cannot archive exchange: user query unavailable")
 directory=project/"responses"
