@@ -18,18 +18,18 @@ automatically convert hyphens to underscores (`claude-skill-goal` ->
 control characters, Unicode lookalikes, and longer names are rejected.
 The full target path is limited to 2048 bytes. Invalid input fails before setup.
 
-    mkproj --dry-run --agent=none my_tool
-    mkproj --doctor
-    mkproj --test
+    mkproj preview --agent=none my_tool
+    mkproj diagnose
+    mkproj test
     mkproj --no-global --agent=claude my_tool
     mkproj --no-global --agent=codex my_tool
     mkproj --no-global --agent=none my_tool
     mkproj --template claude-code my_tool   # select a named template
     mkproj --list-templates                 # print available templates
 
-Choose one command mode and at most one project name. Duplicate or unknown
-options fail. `--test` and `--help` take no additional arguments.
-`--doctor` takes only an optional name. `--agent` accepts exactly claude/codex/none.
+Choose one command and at most one project name. Duplicate or unknown
+options fail. `test` and `help` take no additional arguments.
+`diagnose` takes only an optional name. `--agent` accepts exactly claude/codex/none.
 
 ## Non-interactive usage
 
@@ -74,26 +74,26 @@ launching either agent. `--no-global` skips shell/global hook configuration.
 
     bash tests/test-input.sh
     .venv/bin/python -m unittest discover -s tests -p 'test_reliability.py' -v
-    mkproj --test
-    mkproj --doctor
+    mkproj test
+    mkproj diagnose
 
-`--test` is isolated and never pushes or edits user-global configuration.
-`--dry-run` and `--doctor` are read-only.
+`test` is isolated and never pushes or edits user-global configuration.
+`preview` and `diagnose` are read-only.
 See reliability.md for backups, recovery, failure handling, and guard limitations.
 
 ## Updating existing projects
 
 After upgrading mkproj, update a single project:
 
-    cd ~/Projects/my_tool && mkproj --update
+    cd ~/Projects/my_tool && mkproj update
 
 Update every mkproj-managed project under a directory:
 
-    mkproj --scan ~/Projects
+    mkproj scan ~/Projects
 
 See which projects have pending changes without touching anything (exits 2 if any):
 
-    mkproj --status ~/Projects
+    mkproj status ~/Projects
 
 The update decision for each file follows this table:
 
@@ -115,18 +115,18 @@ never committed.
 Deferred conflicts are saved with status `deferred` in `.mkproj`. Review them
 all at once:
 
-    mkproj --pending ~/Projects
+    mkproj pending ~/Projects
 
 ## Enrolling an existing project
 
 If you have a Claude Code project (one with `.claude/` or `CLAUDE.md`) that was
 not bootstrapped with mkproj, enroll it:
 
-    cd ~/Projects/legacy_project && mkproj --adopt
+    cd ~/Projects/legacy_project && mkproj adopt
 
 Adopt never modifies existing files. It only adds missing entries to `.gitignore`
 and installs AGENTS.md if absent, then writes `.mkproj` recording the current
-state. After adoption, `--update` can install new template files and track
+state. After adoption, `update` can install new template files and track
 further changes.
 
 ## Keybindings

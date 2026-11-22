@@ -25,9 +25,9 @@ These behaviors go beyond "copy some files":
 
 **Idempotency.** Every file and directory creation is guarded by an existence check. Re-running `mkproj` on a partially bootstrapped project is safe -- it fills in what's missing and skips what's already there. Bootstrap refuses to run on any project with more than one commit, so running it on a live project is impossible.
 
-**Update tracking with conflict resolution.** Every bootstrapped project carries a `.mkproj` registry that records the template hash and the installed hash for each file. `mkproj --update` and `mkproj --scan` use those hashes to determine whether a file has drifted from the template. Files you've edited are preserved; files the template changed are updated silently; files where both sides changed get a conflict prompt: update / keep / defer / stop. This is a real update system, not a blind overwrite.
+**Update tracking with conflict resolution.** Every bootstrapped project carries a `.mkproj` registry that records the template hash and the installed hash for each file. `mkproj update` and `mkproj scan` use those hashes to determine whether a file has drifted from the template. Files you've edited are preserved; files the template changed are updated silently; files where both sides changed get a conflict prompt: update / keep / defer / stop. This is a real update system, not a blind overwrite.
 
-**File tiers.** Template files are classified as `directive`, `infrastructure`, or `optional`. `--safe-update` only touches `optional` files, never `directive` or `infrastructure`. `--restore-infra` reinstates infrastructure files that have been deleted or corrupted. `--check` and `--report` audit the tier state without making changes.
+**File tiers.** Template files are classified as `directive`, `infrastructure`, or `optional`. `update --safe` only touches infrastructure-tier auto-updates, never directive files. `restore` reinstates infrastructure files that have been deleted or corrupted. `check` and `report` audit the tier state without making changes.
 
 **Staged-only auto-commit.** The Stop hook only commits files that were explicitly staged by Claude during the session. It does not sweep up unrelated untracked or modified files, so your working tree is never touched by an automatic commit.
 

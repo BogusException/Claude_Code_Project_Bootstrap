@@ -7,7 +7,7 @@ Section references use the format: `filename §N.N`
 
 **A**
 
-**--adopt (enroll non-mkproj project)** -- usage.md §7
+**adopt (enroll non-mkproj project)** -- usage.md §7
 **Auto-commit hook (staged-only)** -- how-it-works.md §Bootstrap phases
 **Auto-venv (cd override)** -- how-it-works.md §Bootstrap phases
 
@@ -19,7 +19,7 @@ Section references use the format: `filename §N.N`
 
 **C**
 
-**--check (tier compliance audit)** -- usage.md §Updating existing projects
+**check (tier compliance audit)** -- usage.md §Updating existing projects
 **Claude Code hooks** -- how-it-works.md §Bootstrap phases
 **CLAUDE.md (template)** -- customizing.md §2
 **Conflict resolution (update)** -- usage.md §Updating existing projects
@@ -37,6 +37,7 @@ Section references use the format: `filename §N.N`
 
 **GitHub remote** -- adding-remotes.md §3
 **Git guards (native pre-commit/pre-push)** -- overview.md §3
+**Governance (third-party isolation policy)** -- governance.md
 
 **H**
 
@@ -64,8 +65,8 @@ Section references use the format: `filename §N.N`
 
 **M**
 
-**mkproj --help** -- usage.md §Inputs and options
-**mkproj --test** -- usage.md §Tests and diagnostics
+**mkproj help** -- usage.md §Inputs and options
+**mkproj test** -- usage.md §Tests and diagnostics
 **.mkproj (project identity file)** -- usage.md §Updating existing projects
 **Multi-template architecture** -- customizing.md §1, §8
 
@@ -75,7 +76,7 @@ Section references use the format: `filename §N.N`
 
 **P**
 
-**--pending (resolve deferred conflicts)** -- usage.md §Updating existing projects
+**pending (resolve deferred conflicts)** -- usage.md §Updating existing projects
 **Protected files** -- how-it-works.md §Bootstrap phases
 **Python venv** -- how-it-works.md §Bootstrap phases
 
@@ -83,21 +84,21 @@ Section references use the format: `filename §N.N`
 
 **Reading order** -- overview.md §6
 **Remote repo** -- adding-remotes.md §1
-**--report (tier report)** -- usage.md §Updating existing projects
+**report (tier report)** -- usage.md §Updating existing projects
 **Requirements (prerequisites)** -- install.md §1
-**--restore-infra** -- usage.md §Updating existing projects
+**restore (restore deleted infrastructure files)** -- usage.md §Updating existing projects
 **responses/ directory** -- usage.md §Verification and launch
 
 **S**
 
 **/audit skill** -- how-it-works.md §Skills
 **/scan skill** -- how-it-works.md §Skills
-**--scan (recursive update)** -- usage.md §Updating existing projects
+**scan (recursive update)** -- usage.md §Updating existing projects
 **Screen session** -- overview.md §3
 **settings.json** -- how-it-works.md §Bootstrap phases
 **SourceForge remote** -- adding-remotes.md §4
 **SSH keys** -- adding-remotes.md §3.2
-**--status (dry-run scan)** -- usage.md §Updating existing projects
+**status (read-only scan)** -- usage.md §Updating existing projects
 
 **T**
 
@@ -108,7 +109,7 @@ Section references use the format: `filename §N.N`
 
 **U**
 
-**--update (update single project)** -- usage.md §Updating existing projects
+**update (update single project)** -- usage.md §Updating existing projects
 **Update tracking** -- overview.md §3
 
 **V**

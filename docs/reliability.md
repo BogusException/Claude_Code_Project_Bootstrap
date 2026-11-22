@@ -2,9 +2,9 @@
 
 ## Read-only and test modes
 
---dry-run validates inputs and inspects the target before printing a plan. It
+preview validates inputs and inspects the target before printing a plan. It
 does not create project files, install packages, configure globals, or push.
---doctor reports prerequisites, the project venv, ignore protection, native Git
+diagnose reports prerequisites, the project venv, ignore protection, native Git
 guards, working-tree state, and all origin push destinations. Blocking findings produce
 a nonzero exit status; optional missing agents are reported separately.
 
