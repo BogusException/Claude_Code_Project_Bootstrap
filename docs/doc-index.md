@@ -37,6 +37,7 @@ Section references use the format: `filename §N.N`
 
 **GitHub remote** -- adding-remotes.md §3
 **Git guards (native pre-commit/pre-push)** -- overview.md §3
+**Gotchas (hazard catalog)** -- gotchas.md
 **Governance (third-party isolation policy)** -- governance.md
 
 **H**
