@@ -68,13 +68,19 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 
 ---
 
-## G-006: v3.1.0 maintenance commands may not accept v2.x manifests
+## G-006: v3 silently skips most v2-manifest files due to path refactor
 
-**Symptom**: `mkproj check` on a v2.0.0-manifest project (pfsense_wazuh) may or may not work once G-003 is fixed. Testing blocked behind G-003.
+**Symptom**: `mkproj check --verbose` on a v2.0.0 project (pfsense_wazuh) reports ONE file (`.claude/settings.json`) as ok. The v2 manifest tracked more (rules, requirements.txt, etc.). `mkproj status` reports "up to date" despite the v2→v3 architectural gap.
 
-**Cause (hypothesized)**: Manifest schema may have changed between v2 and v3 (multi-template rewrite). `lib/update.sh` may expect v3 fields that v2 manifests lack.
+**Cause**: Not a schema-field issue (manifests are parseable). The v3.0.0 multi-template refactor moved tracked files from flat `templates/` to `templates/claude-code/{project,claude,git-hooks}/`. A v2 manifest's recorded paths (e.g. `.claude/rules/database.md`) do not match the file set in v3's template manifest, so v3's check loop silently ignores them.
 
-**Status**: unknown. Will be verifiable once G-003 is patched. Dry-run on pfsense_wazuh is the canary (smallest + oldest-schema among the 9 pre-v3 managed projects).
+**Impact**: The 9 pre-v3 managed projects (auto-brain, cc-accelo, claude-skill-goal, claude_skills, cx-goldmine, cx-todolist, model_router, ollama, pfsense_wazuh) appear "up to date" but are actually unmigrated. `update` won't bring them forward.
+
+**Fix (future)**: Write a one-shot v2→v3 manifest migration. For each v2-tracked file, locate its new path in the current template tree (if it still exists) and rewrite the manifest entry. Drop entries for files that no longer exist in the template.
+
+**Workaround**: For Phase 1 batch work, run scan only against directories that exclude the 9 managed projects. The 17 clean-adopt candidates are listed in `responses/internal/phase1-inventory.md` section 2.
+
+**Status**: open. Blocks the resolution of the 9 pre-v3 managed projects.
 
 ---
 

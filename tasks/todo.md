@@ -8,12 +8,27 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 
 ## P0 — current screw
 
+- [ ] **Phase 1 clean-adopt batch, isolated from v2 managed projects**
+  - Build a staging directory (e.g. `~/Projects/_phase1/`) containing only the 17 clean-adopt candidates (symlinks so paths don't actually move).
+  - Run `mkproj scan ~/Projects/_phase1` interactively; answer yes on each prompt.
+  - Verify each adoption: `.mkproj` file present, `mkproj check` clean.
+  - Remove the staging dir.
+  - Why isolated: scan on real `~/Projects/` currently crashes on the 9 pre-v3 managed projects (G-009) and silently mis-reports their state (G-006).
+
+## P1 — once Phase 1 clean batch is done
+
 - [ ] **Fix `mkproj scan` sub-invocation on v2.x managed projects** (gotcha G-009)
-  - Scan calls into the update path for each managed project; update on a v2.0.0/v2.1.0 manifest reaches `install_claude_tree` (bootstrap.sh:573) which is a bootstrap-time walker.
+  - Scan calls into the update path for each managed project; update on a v2.0.0/v2.1.0 manifest reaches `install_claude_tree` (bootstrap.sh:573).
   - Separately, `read_choice` under `set -u` leaves `choice` unset when stdin closes mid-prompt (`lib/update.sh:179`).
-  - Outcome: scan is unreliable on real `~/Projects/`. Blocks Phase 1 batch adoption.
-  - Fix either requires v2-manifest migration in update, or scan should skip pre-v3 manifests with a warning until migration ships.
+  - Fix either requires v2→v3 manifest migration (G-006), or scan should skip pre-v3 manifests with a warning until migration ships.
   - Add regression test: `mkproj scan` on a dir containing both a v2 fixture and a v3 fixture does not crash.
+
+- [ ] **v2→v3 manifest path migration** (gotcha G-006)
+  - One-shot script. For each v2-tracked file in each of the 9 managed projects, look up its new path in `templates/claude-code/...`. Rewrite the manifest entry. Drop entries for files no longer in template.
+  - Required before any of the 9 pre-v3 managed projects can be meaningfully updated.
+
+- [ ] **Fix `release.sh` silent gh-release-create skip**
+  - v3.1.1 release.sh pushed the commit and tag but did not create the GitHub release. Manual `gh release create` recovered. Script needs investigation: either the gh call failed silently or the pipeline before line 81 bailed without an error message.
 
 ## P1 — next screw after v3.1.1 ships
 
