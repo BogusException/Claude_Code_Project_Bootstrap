@@ -55,6 +55,10 @@ desktop.ini
 .codex/sessions/
 .codex/log/
 
+# Per-developer private-identifier scan list (see docs/privacy-and-security.md).
+# Only the .example copy is tracked; the live file is per-machine.
+.claude/private-identifiers.txt
+
 # mkproj project identity (per-project, not for version control)
 .mkproj
 

@@ -39,6 +39,10 @@ responses/
 # Private filesystem backups at any depth
 **/backups/
 
+# Per-developer private-identifier scan list (see docs/privacy-and-security.md).
+# Only the .example copy is tracked; the live file is per-machine.
+.claude/private-identifiers.txt
+
 # OS
 .DS_Store
 Thumbs.db
