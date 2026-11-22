@@ -77,6 +77,8 @@ Section references use the format: `filename §N.N`
 **P**
 
 **pending (resolve deferred conflicts)** -- usage.md §Updating existing projects
+**Personal identifier scanning** -- privacy-and-security.md §Personal identifier scanning
+**Privacy and security** -- privacy-and-security.md
 **Protected files** -- how-it-works.md §Bootstrap phases
 **Python venv** -- how-it-works.md §Bootstrap phases
 

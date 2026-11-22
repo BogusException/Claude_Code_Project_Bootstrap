@@ -7,10 +7,19 @@ set -uo pipefail
 
 emit() {
   # $1 = decision (deny|ask) ; $2 = reason
+  # Claude Code hook protocol:
+  #   exit 0 + JSON  -> JSON drives the decision (required for "ask" prompts)
+  #   exit 2         -> hard block, JSON ignored
+  # Previously this emit used exit 2 for both "ask" and "deny", so "ask"
+  # decisions silently became hard blocks instead of surfacing a prompt.
   local decision="$1"
   local reason="${2//\"/\\\"}"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$decision" "$reason"
-  exit 2
+  if [[ "$decision" == "ask" ]]; then
+    exit 0
+  else
+    exit 2
+  fi
 }
 
 if ! command -v jq >/dev/null 2>&1; then

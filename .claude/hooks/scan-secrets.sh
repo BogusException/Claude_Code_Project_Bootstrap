@@ -51,6 +51,15 @@ if echo "$CONTENT" | grep -qE 'xox[bpras]-[0-9a-zA-Z-]{10,}'; then
   MATCHES="$MATCHES Slack token;"
 fi
 
+
+IDENT_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/private-identifiers.txt"
+if [ -f "$IDENT_FILE" ]; then
+  IDENT_PATTERNS=$(grep -vE '^[[:space:]]*(#|$)' "$IDENT_FILE" | paste -sd'|' -)
+  if [ -n "$IDENT_PATTERNS" ] && echo "$CONTENT" | grep -qE "$IDENT_PATTERNS"; then
+    MATCHES="$MATCHES personal identifier;"
+  fi
+fi
+
 if echo "$CONTENT" | grep -qE -- '-----BEGIN[[:space:]]+(RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'; then
   MATCHES="$MATCHES private key block;"
 fi
@@ -67,7 +76,9 @@ fi
 if [ -n "$MATCHES" ]; then
   REASON="Possible secret detected in content:$MATCHES Review carefully before allowing."
   echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"$REASON\"}}"
-  exit 2
+  # exit 0 so the JSON "ask" decision drives a prompt. exit 2 would hard-block
+  # regardless of the JSON, which was the pre-fix behavior of this file.
+  exit 0
 fi
 
 exit 0
