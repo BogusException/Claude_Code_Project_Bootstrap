@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0] - 2026-11-22 -- CRC32(bootstrap.sh) `f8725367`
+
+### Added
+- Command-form syntax: `mkproj update`, `scan`, `check`, `diagnose`, `restore`, `tiers`, `preview`, `adopt`, `pending`, `status`, `test`, `version`, `help`. Legacy `--option` form still accepted.
+- `docs/governance.md`: third-party isolation policy. Clarifies that project-bootstrap owns its own hooks only and is not responsible for patching third-party tools.
+- `--safe` option on `mkproj update` (equivalent to legacy `safe-update` mode).
+
+### Fixed
+- `save-response.sh`: transcript scan now reads backward from end, fixing high-context Stop hook latency.
+- `scan-secrets.sh`: responses/ directory excluded from secret scans (false positives on archived chat text).
+- bootstrap.sh execute permission restored (was 644, caused exit 126).
+
 ## [3.0.2] - 2026-11-21 -- CRC32(bootstrap.sh) `6b68ba14`
 
 ### Changed
