@@ -715,7 +715,7 @@ generate_settings_json() {
       {
         "matcher": "",
         "hooks": [
-          {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/save-response.sh",        "timeout": 15, "statusMessage": "Saving response..."},
+          {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/save-response.sh",        "timeout": 30, "statusMessage": "Saving response..."},
           {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/auto-commit.sh",          "timeout": 30, "statusMessage": "Auto-committing changes..."}
         ]
       }
