@@ -15,29 +15,34 @@ if not response.strip():
 query=payload.get("prompt","")
 transcript=payload.get("transcript_path","")
 if transcript:
-    # Read only the last 64 KB so long sessions on slow filesystems stay fast.
-    TAIL=65536
+    # Scan backward through JSONL chunks to find the most recent non-empty user message.
+    # Stops as soon as one is found so long transcripts stay fast.
+    CHUNK=65536
+    buf=b""
     with open(transcript,"rb") as raw:
-        raw.seek(0,2)
-        size=raw.tell()
-        raw.seek(max(0,size-TAIL))
-        tail=raw.read()
-    skip_first=size>TAIL
-    for line in io.TextIOWrapper(io.BytesIO(tail),encoding="utf-8",errors="replace"):
-        if skip_first:
-            skip_first=False
-            continue
-        try: entry=json.loads(line)
-        except json.JSONDecodeError: continue
-        msg=entry.get("message",{})
-        if msg.get("role")!="user": continue
-        content=msg.get("content","")
-        if isinstance(content,str) and content.strip(): query=content.strip()
-        elif isinstance(content,list):
-            texts=[b["text"] for b in content if isinstance(b,dict) and b.get("type")=="text" and isinstance(b.get("text"),str) and b["text"].strip()]
-            if texts: query="\n".join(texts)
+        raw.seek(0,2); size=raw.tell(); pos=size
+        while pos>0 and not query:
+            read_size=min(CHUNK,pos); pos-=read_size
+            raw.seek(pos); chunk=raw.read(read_size)
+            buf=chunk+buf
+            lines=buf.split(b"\n")
+            buf=lines[0] if pos>0 else b""
+            lines=lines[1:] if pos>0 else lines
+            for line in reversed(lines):
+                line=line.strip()
+                if not line: continue
+                try: entry=json.loads(line)
+                except json.JSONDecodeError: continue
+                msg=entry.get("message",{})
+                if msg.get("role")!="user": continue
+                c=msg.get("content","")
+                if isinstance(c,str) and c.strip():
+                    query=c.strip(); break
+                elif isinstance(c,list):
+                    texts=[b["text"] for b in c if isinstance(b,dict) and b.get("type")=="text" and isinstance(b.get("text"),str) and b["text"].strip()]
+                    if texts: query="\n".join(texts); break
 if not isinstance(query,str) or not query.strip():
-    raise ValueError("Cannot archive exchange: user query unavailable")
+    sys.exit(0)  # no query found; skip archive silently
 directory=project/"responses"
 if directory.is_symlink():
     raise RuntimeError("Refusing a symlinked archive directory")
