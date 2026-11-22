@@ -33,8 +33,8 @@ copier. New interactive template selection prompt at mkproj run time.
 
 - [x] Fix guard_path() --no-index blocking tracked template responses files
 - [x] Fix .githooks/pre-commit and pre-push delegating to old templates/git-hooks/ path
-- [x] Replace personal identifier /home/pat/ with /home/user/ in design doc example
-- [x] Update stale theitguys GitHub handle to BogusException throughout
+- [x] Replace developer-specific home path with generic /home/user/ placeholder in design doc example
+- [x] Update stale GitHub handle to BogusException throughout
 - [x] Add /scan skill to template (privacy and secrets scan)
 - [x] Rewrite all docs for v3.0.0 multi-template architecture
 - [x] Add non-obvious capabilities overview to README and overview.md

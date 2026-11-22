@@ -28,8 +28,8 @@
 ## [3.0.1] - 2026-11-21 -- CRC32(bootstrap.sh) `766f806a`
 
 ### Fixed
-- Replace personal identifier (`/home/pat/`) with generic placeholder in design doc example.
-- Update stale `theitguys` GitHub handle to `BogusException` in bootstrap.sh manpage and impl doc.
+- Replace developer-specific absolute home path with generic placeholder in design doc example.
+- Update stale GitHub handle to current `BogusException` in bootstrap.sh manpage and impl doc.
 - Remove `--no-index` from `git check-ignore` in `guard_path()` so tracked files inside template
   `responses/` subdirectories are not blocked by sub-directory `.gitignore` patterns.
 - Fix `.githooks/pre-commit` and `.githooks/pre-push` delegating to old `templates/git-hooks/` path.
