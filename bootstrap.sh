@@ -8,7 +8,7 @@ TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
 TEMPLATE_NAME=""    # set in initialize(); empty = prompt user
 TEMPLATE_DIR=""     # set in initialize() after TEMPLATE_NAME is resolved
 MODULE_NAME=""      # derived from PROJECT_NAME (hyphens -> underscores)
-MKPROJ_VERSION="3.1.1"
+MKPROJ_VERSION="3.1.2"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
@@ -1376,14 +1376,12 @@ main() {
         exec {BARE_LOCK_FD}>"$lock_dir/$lock_key"
         flock -n "$BARE_LOCK_FD" || { err "Another mkproj instance owns the bare destination."; return 1; }
     fi
-    # Maintenance modes (scan/check/status/pending/safe-update/report/
-    # restore-infra/list-tiers) are dispatched at the top-level case BEFORE
-    # main() runs, so they skip phase1_preflight. Only the bootstrap-adjacent
-    # modes that need PROJECT_NAME/PROJECT_DIR reach this point.
+    # Maintenance and adopt modes are dispatched at the top-level case BEFORE
+    # main() runs, so they skip phase1_preflight. Only `update` and `accept`
+    # stay here because they can legitimately need the bootstrap-style checks.
     case "$MODE" in
         update)        run_update_mode;        exit $? ;;
         accept)        run_accept_mode;        exit $? ;;
-        adopt)         run_adopt_mode;         exit $? ;;
     esac
     check_project_repo
     check_repo_destination
@@ -1429,6 +1427,10 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         report)          run_report_mode ;;
         restore-infra)   run_restore_infra_mode ;;
         list-tiers)      run_list_tiers_mode ;;
+        # adopt: enrolls an existing project with real commits. phase1_preflight's
+        # check_project_repo refuses projects with real history, so adopt also
+        # dispatches here. PROJECT_DIR was already set by initialize. (G-010)
+        adopt)           run_adopt_mode ;;
         *)               main ;;
     esac
 fi

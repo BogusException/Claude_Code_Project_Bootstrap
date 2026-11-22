@@ -106,6 +106,30 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 
 ---
 
+## G-010: `mkproj adopt` refused projects with real history in v3.1.0 / v3.1.1
+
+**Symptom**: `mkproj adopt` on an existing project with commits died with "STOP: project contains real project commits" at bootstrap.sh:410.
+
+**Cause**: Adopt went through `main()` → `phase1_preflight()` → `check_project_repo()`, which refuses projects with more than 1 commit or whose single commit isn't "Initial project scaffold." That check is correct for bootstrap mode (don't scaffold over an existing project), but the entire purpose of `adopt` is to enroll a project that already has history.
+
+**Fix**: v3.1.2. Moved `adopt` to the top-level dispatcher alongside the maintenance modes. `PROJECT_DIR` is already set by `initialize()` (lines 345-364 handle `adopt`, `accept`, `update`), so the top-level case can call `run_adopt_mode` directly.
+
+**Status**: fixed.
+
+---
+
+## G-011: `mkproj adopt` force-installed stale-path AGENTS.md
+
+**Symptom**: `mkproj adopt` on a project that lacked `AGENTS.md` died with `cp: cannot stat '/ssd-pool/.../templates/AGENTS.md': No such file or directory`. Even when it would have succeeded (on machines where the old flat `templates/` tree was still present), it would have force-installed Codex's directive file into a project that had explicitly chosen Claude Code only.
+
+**Cause**: `lib/update.sh:608-612` used `$TEMPLATES_DIR/AGENTS.md`, the pre-v3.0 flat template layout. v3.0.0's multi-template refactor moved all project files to `$TEMPLATES_DIR/claude-code/project/`. The code was never updated. Compounding problem: the install was unconditional, ignoring the project's agent choice.
+
+**Fix**: v3.1.2. Rewrote `adopt_project()` to record whichever of `CLAUDE.md` / `AGENTS.md` already exist in the project, hashed against the current template default. Do NOT install new files during adopt. A project with only CLAUDE.md stays Claude-Code-only; a project with both files records both.
+
+**Status**: fixed. Related to TODO-D (install-time agent-choice filter) and TODO-B (dual-MD cleanup).
+
+---
+
 ## G-008: `~/Projects/` contains loose files that aren't projects
 
 **Symptom**: `~/Projects/` has 18 top-level files (`.sh`, `.md`, `.ps1`, `.txt`, `.json`, `.html`, `.conf`) plus archive and scratch directories. `mkproj scan ~/Projects` walks past all of them.

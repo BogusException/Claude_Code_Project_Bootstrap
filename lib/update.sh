@@ -605,12 +605,19 @@ adopt_project() {
         grep -qxF "$line" "$gitignore" 2>/dev/null || printf '%s\n' "$line" >> "$gitignore"
     done
 
-    if [[ ! -f "$project_dir/AGENTS.md" ]]; then
-        cp "$TEMPLATES_DIR/AGENTS.md" "$project_dir/AGENTS.md"
-        registry_set_file "$project_dir" "AGENTS.md" \
-            "$(sha256sum "$TEMPLATES_DIR/AGENTS.md" | cut -d' ' -f1)" \
-            "$(sha256sum "$project_dir/AGENTS.md" | cut -d' ' -f1)" "installed" "directive"
-    fi
+    # Record whichever directive files already exist. Do NOT install new ones.
+    # The old code unconditionally installed AGENTS.md from a stale v2 template
+    # path ($TEMPLATES_DIR/AGENTS.md, which v3 does not have) and violated the
+    # agent-choice principle by forcing Codex's directive file into every
+    # project. (G-011, TODO-D)
+    local tmpl_dir="$TEMPLATES_DIR/claude-code/project"
+    for f in CLAUDE.md AGENTS.md; do
+        if [[ -f "$project_dir/$f" && -f "$tmpl_dir/$f" ]]; then
+            registry_set_file "$project_dir" "$f" \
+                "$(sha256sum "$tmpl_dir/$f" | cut -d' ' -f1)" \
+                "$(sha256sum "$project_dir/$f" | cut -d' ' -f1)" "installed" "directive"
+        fi
+    done
 
     log "  adopted: $project_dir"
 }

@@ -8,12 +8,11 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 
 ## P0 — current screw
 
-- [ ] **Phase 1 clean-adopt batch, isolated from v2 managed projects**
-  - Build a staging directory (e.g. `~/Projects/_phase1/`) containing only the 17 clean-adopt candidates (symlinks so paths don't actually move).
-  - Run `mkproj scan ~/Projects/_phase1` interactively; answer yes on each prompt.
-  - Verify each adoption: `.mkproj` file present, `mkproj check` clean.
-  - Remove the staging dir.
-  - Why isolated: scan on real `~/Projects/` currently crashes on the 9 pre-v3 managed projects (G-009) and silently mis-reports their state (G-006).
+- [ ] **Phase 1 clean-adopt batch, via individual `mkproj adopt` calls**
+  - 16 projects (project-bootstrap excluded as circular): ai-models, ai-writer, block_lg_telemetry, books-yumi, brick2, fb-saved, gmail_incremental, grafana-1, isitai, making-money_v1, mempalace_notes, mktg_1, ping-watch, rp, selling-digital, syncro.
+  - Pivot from scan: `mkproj scan` doesn't follow symlinks (new gotcha, lib/update.sh:577), so staging-with-symlinks doesn't work. Scan on real `~/Projects/` also crashes on the 9 pre-v3 managed projects (G-009).
+  - Approach: loop `(cd ~/Projects/<name> && mkproj adopt)` for each of the 16.
+  - Verify each: `.mkproj` file present and valid JSON with `mkproj_version: 3.1.2`.
 
 ## P1 — once Phase 1 clean batch is done
 
@@ -95,6 +94,7 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 
 ## Done this session (2026-11-22, newest first)
 
+- **Released v3.1.2**: fix adopt preflight (G-010) and adopt stale-path/force-install bug (G-011)
 - **Released v3.1.1**: fix scan/check/status/pending/safe-update/report/restore-infra/list-tiers dispatch (G-003)
 - Fix hook `ask` / exit-2 bug in `protect-files.sh` and `scan-secrets.sh` (G-001)
 - Fix `release.sh` to pass `--repo` and tag before push (G-002)

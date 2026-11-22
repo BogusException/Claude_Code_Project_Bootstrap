@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.1.2] - 2026-11-22 -- CRC32(bootstrap.sh) `b3270103`
+
+### Fixed
+- `mkproj adopt` ran through `phase1_preflight`, which refused any project with real commit history ("STOP: project contains real project commits") — but refusing real history is exactly backwards for a command whose job is enrolling existing projects. Moved `adopt` to the top-level dispatcher so it skips the bootstrap-mode preflight. (G-010)
+- `adopt_project()` tried to install `AGENTS.md` from a stale v2 template path (`$TEMPLATES_DIR/AGENTS.md`, no longer exists under the v3 multi-template layout) and did so unconditionally, forcing Codex's directive file into every adopted project regardless of the user's agent choice. Rewrote to only record directive files that already exist in the project, matching the user's agent-choice principle (TODO-D). (G-011)
+
 ## [3.1.1] - 2026-11-22 -- CRC32(bootstrap.sh) `4ceb4569`
 
 ### Fixed
