@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.1.1] - 2026-11-22 -- CRC32(bootstrap.sh) `4ceb4569`
+
+### Fixed
+- `mkproj scan`, `check`, `status`, `pending`, `safe-update`, `report`, `restore-infra`, and `list-tiers` all failed in v3.1.0 because of two bugs (gotcha G-003). First, an `&& ... = "$PWD"` one-liner in `lib/input.sh` returned non-zero when a DIR argument was passed, which propagated as `parse_args` returning 1 under `set -e`. Second, these maintenance modes fell through to `main()`, which ran `phase1_preflight` before the mode dispatch, and preflight read an unset `PROJECT_NAME` under `set -u`. Fixed by converting the `&&` to an `if` block and dispatching maintenance modes at the top-level case before `main()` is called.
+
 ## [3.1.0] - 2026-11-22 -- CRC32(bootstrap.sh) `f8725367`
 
 ### Added

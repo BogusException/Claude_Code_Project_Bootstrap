@@ -166,7 +166,9 @@ parse_args() {
                 HAS_PROJECT_ARG=false
                 PROJECT_ARG=""
             fi
-            [[ -z "$SCAN_DIR" ]] && SCAN_DIR="$PWD"
+            # Use `if` not `&& SCAN_DIR=...`; an `&&` that fails its test returns
+            # non-zero, which becomes parse_args's status under set -e. (G-003 Bug A)
+            if [[ -z "$SCAN_DIR" ]]; then SCAN_DIR="$PWD"; fi
             ;;
     esac
 }

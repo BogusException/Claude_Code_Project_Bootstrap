@@ -8,11 +8,12 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 
 ## P0 — current screw
 
-- [ ] **Patch v3.1.1 to fix `scan`/`check`/`update` dispatch** (gotcha G-003)
-  - Pinpoint the defect in `lib/input.sh` `parse_args()` or in the `initialize()` early-return at `bootstrap.sh:326-329`.
-  - Fix so `MODE=scan|check|update|pending|status|report|safe-update|restore-infra|list-tiers` all return from initialize before bootstrap preflight.
-  - Add regression test in `bootstrap.sh test` that calls each maintenance mode against a fresh test-mode project and asserts it does NOT hit bootstrap preflight.
-  - Bump to v3.1.1, CHANGELOG entry, release.sh.
+- [ ] **Fix `mkproj scan` sub-invocation on v2.x managed projects** (gotcha G-009)
+  - Scan calls into the update path for each managed project; update on a v2.0.0/v2.1.0 manifest reaches `install_claude_tree` (bootstrap.sh:573) which is a bootstrap-time walker.
+  - Separately, `read_choice` under `set -u` leaves `choice` unset when stdin closes mid-prompt (`lib/update.sh:179`).
+  - Outcome: scan is unreliable on real `~/Projects/`. Blocks Phase 1 batch adoption.
+  - Fix either requires v2-manifest migration in update, or scan should skip pre-v3 manifests with a warning until migration ships.
+  - Add regression test: `mkproj scan` on a dir containing both a v2 fixture and a v3 fixture does not crash.
 
 ## P1 — next screw after v3.1.1 ships
 
@@ -79,6 +80,7 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 
 ## Done this session (2026-11-22, newest first)
 
+- **Released v3.1.1**: fix scan/check/status/pending/safe-update/report/restore-infra/list-tiers dispatch (G-003)
 - Fix hook `ask` / exit-2 bug in `protect-files.sh` and `scan-secrets.sh` (G-001)
 - Fix `release.sh` to pass `--repo` and tag before push (G-002)
 - Add personal-identifier scan class to `scan-secrets.sh`, with `.example` file and docs

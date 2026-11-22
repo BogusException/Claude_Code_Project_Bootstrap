@@ -30,15 +30,15 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 
 ---
 
-## G-003: `mkproj scan`, `check`, `update` broken in v3.1.0
+## G-003: Maintenance commands broken in v3.1.0 (scan/check/status/pending/safe-update/report/restore-infra/list-tiers)
 
-**Symptom**: `mkproj scan <DIR>` dies at `parse_args` (bootstrap.sh:324, exit 1). `mkproj scan` from inside a project dies at bootstrap.sh:394 with `PROJECT_NAME: unbound variable`. Legacy `--scan` form identical. `check` same pattern.
+**Symptom**: `mkproj scan <DIR>` dies at `parse_args` (bootstrap.sh:324, exit 1). `mkproj scan` from inside a project dies at bootstrap.sh:394 with `PROJECT_NAME: unbound variable`. Legacy `--scan` form identical. Same for the other seven maintenance modes.
 
-**Cause (under investigation)**: `initialize()` has an early-return branch at line 326-329 that should exit for `MODE=scan|check|update|...`. It isn't firing. Either `parse_args` fails before `MODE` gets set, or `MODE` is set to something other than the expected value. `mkproj test` works because test mode has its own branch.
+**Cause**: Two bugs. (1) `lib/input.sh:169` used `[[ -z "$SCAN_DIR" ]] && SCAN_DIR="$PWD"` as the last line of `parse_args`. When a DIR arg was given, the test was false, the `&&` returned non-zero, which under `set -e` aborted bootstrap at line 324. (2) `main()` ran `phase1_preflight` before the mode dispatch at lines 1379-1389. The early-return in `initialize()` worked but it skipped the code that sets `PROJECT_NAME`, so preflight read an unset variable under `set -u`.
 
-**Workaround**: none. These are the primary maintenance commands.
+**Fix**: v3.1.1. Converted the `&&` to an `if` block. Moved all 8 maintenance modes out of `main()`'s case and into the top-level case at `bootstrap.sh:1420`, so they dispatch BEFORE `main()` is called. Only `update`, `accept`, and `adopt` stay in main.
 
-**Status**: open. Target v3.1.1 patch. Blocks the Phase 1 project-adoption rollout.
+**Status**: fixed.
 
 ---
 
@@ -85,6 +85,18 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 **Fix**: `tasks/todo.md` is now a priority-sorted live backlog. Historical release logs move to CHANGELOG where they belong.
 
 **Status**: done.
+
+---
+
+## G-009: `mkproj scan` sub-invocation hits template-install code on v2.x managed projects
+
+**Symptom**: Running `mkproj scan ~/Projects` prints two `mkproj failed in phase initialize (line 573, exit 1)` errors before the first project walk, then stdin-reads for interactive prompts fail with `choice: unbound variable` under set -u.
+
+**Cause (hypothesized)**: scan's inner loop tries to `update` each managed project. For v2.0.0/v2.1.0 manifests (the 9 pre-v3 projects: auto-brain, cc-accelo, claude-skill-goal, claude_skills, cx-goldmine, cx-todolist, model_router, ollama, pfsense_wazuh), the update path reaches `install_claude_tree` at bootstrap.sh:573 which is a bootstrap-time template walker, not an update-time one. Separately, `read_choice` under set -u leaves `choice` unset if stdin closes mid-prompt.
+
+**Workaround for Phase 1 clean-adopt batch**: run scan on a directory that excludes the 9 pre-v3 projects. The 17 clean-adopt candidates are in `responses/internal/phase1-inventory.md` section 2.
+
+**Status**: open. Needs its own screw. Captured in tasks/todo.md.
 
 ---
 

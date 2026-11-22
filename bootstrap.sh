@@ -8,7 +8,7 @@ TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
 TEMPLATE_NAME=""    # set in initialize(); empty = prompt user
 TEMPLATE_DIR=""     # set in initialize() after TEMPLATE_NAME is resolved
 MODULE_NAME=""      # derived from PROJECT_NAME (hyphens -> underscores)
-MKPROJ_VERSION="3.1.0"
+MKPROJ_VERSION="3.1.1"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
@@ -1376,17 +1376,13 @@ main() {
         exec {BARE_LOCK_FD}>"$lock_dir/$lock_key"
         flock -n "$BARE_LOCK_FD" || { err "Another mkproj instance owns the bare destination."; return 1; }
     fi
+    # Maintenance modes (scan/check/status/pending/safe-update/report/
+    # restore-infra/list-tiers) are dispatched at the top-level case BEFORE
+    # main() runs, so they skip phase1_preflight. Only the bootstrap-adjacent
+    # modes that need PROJECT_NAME/PROJECT_DIR reach this point.
     case "$MODE" in
         update)        run_update_mode;        exit $? ;;
-        safe-update)   run_safe_update_mode;   exit $? ;;
-        check)         run_check_mode;         exit $? ;;
-        report)        run_report_mode;        exit $? ;;
         accept)        run_accept_mode;        exit $? ;;
-        restore-infra) run_restore_infra_mode; exit $? ;;
-        list-tiers)    run_list_tiers_mode;    exit $? ;;
-        scan)          run_scan_mode;          exit $? ;;
-        status)        run_status_mode;        exit $? ;;
-        pending)       run_pending_mode;       exit $? ;;
         adopt)         run_adopt_mode;         exit $? ;;
     esac
     check_project_repo
@@ -1423,6 +1419,16 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         list-templates)  list_templates ;;
         doctor)          doctor ;;
         dry-run)         dry_run ;;
+        # Maintenance modes: dispatched here so they skip phase1_preflight.
+        # (G-003 Bug B: preflight read $PROJECT_NAME which is unset for these.)
+        scan)            run_scan_mode ;;
+        check)           run_check_mode ;;
+        status)          run_status_mode ;;
+        pending)         run_pending_mode ;;
+        safe-update)     run_safe_update_mode ;;
+        report)          run_report_mode ;;
+        restore-infra)   run_restore_infra_mode ;;
+        list-tiers)      run_list_tiers_mode ;;
         *)               main ;;
     esac
 fi
