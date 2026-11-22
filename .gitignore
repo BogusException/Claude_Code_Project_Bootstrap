@@ -67,5 +67,4 @@ desktop.ini
 # Local reference notes (private, never commit)
 reference/
 
-# Session handoff file (operational, not tracked)
-HANDOFF.md
+# Session handoff files live in responses/internal/ (covered by responses/ rule above)
