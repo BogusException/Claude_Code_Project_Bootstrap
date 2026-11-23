@@ -39,6 +39,7 @@ parse_args() {
     QUIET=false
     VERBOSE=false
     SAFE_MODE=false
+    MIGRATE_APPLY=false
     FORCE_FILE=""
     ACCEPT_FILE=""
     TEMPLATE_NAME=""
@@ -56,6 +57,7 @@ parse_args() {
             status)   set -- --status        "${@:2}" ;;
             pending)  set -- --pending       "${@:2}" ;;
             adopt)    set -- --adopt         "${@:2}" ;;
+            migrate)  set -- --migrate       "${@:2}" ;;
             restore)  set -- --restore-infra "${@:2}" ;;
             tiers)    set -- --list-tiers    "${@:2}" ;;
             test)     set -- --test          "${@:2}" ;;
@@ -85,7 +87,7 @@ parse_args() {
         fi
         case "$arg" in
             --help|-h|--usage|--test|--doctor|--diagnose|--dry-run|--update|--scan|--status|\
-            --pending|--adopt|--version|--safe-update|--check|--report|--accept|\
+            --pending|--adopt|--migrate|--version|--safe-update|--check|--report|--accept|\
             --restore-infra|--list-tiers|--list-templates)
                 [[ "$mode_seen" == false ]] || { err "Choose one command mode."; return 1; }
                 mode_seen=true
@@ -107,6 +109,7 @@ parse_args() {
                     --restore-infra)        MODE=restore-infra ;;
                     --list-tiers)           MODE=list-tiers ;;
                     --list-templates)       MODE=list-templates ;;
+                    --migrate)              MODE=migrate ;;
                 esac ;;
             --agent=claude|--agent=codex|--agent=none)
                 [[ "$agent_seen" == false ]] || { err "Duplicate agent option."; return 1; }
@@ -119,6 +122,7 @@ parse_args() {
             --quiet|-q)      QUIET=true ;;
             --verbose|-v)    VERBOSE=true ;;
             --safe)          SAFE_MODE=true ;;
+            --apply)         MIGRATE_APPLY=true ;;
             --force-file)    next_is_force=true ;;
             --file)          next_is_file=true ;;
             --template)      next_is_template=true ;;
@@ -160,7 +164,7 @@ parse_args() {
     # scan/status/pending/check/safe-update/report/restore-infra/list-tiers
     # accept a dir arg (not validated as a project name)
     case "$MODE" in
-        scan|status|pending|check|safe-update|report|restore-infra|list-tiers)
+        scan|status|pending|check|safe-update|report|restore-infra|list-tiers|migrate)
             if [[ "$HAS_PROJECT_ARG" == true ]]; then
                 SCAN_DIR="$PROJECT_ARG"
                 HAS_PROJECT_ARG=false

@@ -14,6 +14,7 @@ TEST_MODE=false
 SETUP_LOCAL_REPO=false
 BARE_REPO=""
 SAFE_MODE=false
+MIGRATE_APPLY=false
 CHECK_MODE=false
 REPORT_MODE=false
 FORCE_FILE=""
@@ -58,6 +59,7 @@ SYNOPSIS
        mkproj status  [DIR]
        mkproj pending [DIR]
        mkproj adopt   [NAME]
+       mkproj migrate [DIR] [--apply]
        mkproj preview [--no-global] [--agent=claude|codex|none] [NAME]
        mkproj diagnose [NAME]
        mkproj test
@@ -208,6 +210,15 @@ MODES
               missing files; never modifies existing ones. Creates .mkproj
               recording the current state.
 
+       migrate [DIR] [--apply]
+              Upgrade a v2.x .mkproj registry to v3 format. Dry-run by default:
+              prints a classification table (unchanged / template_changed /
+              user_edit / both_changed / gone_on_disk / orphan) and tier
+              assignments for every tracked file without writing. Pass --apply
+              to stamp tier fields, refresh unchanged template hashes, and bump
+              the stored mkproj_version. Never touches project files -- only
+              .mkproj changes.
+
        preview [--no-global] [--agent=claude|codex|none] [NAME]
               Show what would be created or changed without writing anything.
 
@@ -323,10 +334,25 @@ cleanup_test() {
 initialize() {
     parse_args "$@"
     CONFIGURE_GLOBAL=false
-    if [[ "$MODE" == help || "$MODE" == version || "$MODE" == list-templates || \
-          "$MODE" == scan || "$MODE" == status || "$MODE" == pending || \
+    if [[ "$MODE" == help || "$MODE" == version || "$MODE" == list-templates ]]; then
+        return 0
+    fi
+    if [[ "$MODE" == scan || "$MODE" == status || "$MODE" == pending || \
           "$MODE" == check || "$MODE" == safe-update || "$MODE" == report || \
-          "$MODE" == restore-infra || "$MODE" == list-tiers ]]; then return 0; fi
+          "$MODE" == restore-infra || "$MODE" == list-tiers || \
+          "$MODE" == migrate ]]; then
+        # For single-project maintenance modes, resolve PROJECT_DIR from SCAN_DIR
+        # so we can read .mkproj and set TEMPLATE_DIR. TEMPLATE_DIR must be set
+        # before template_to_project_path and project_to_template_path are called,
+        # or every tracked file silently drops through (G-009 root cause, defect 1).
+        PROJECT_DIR="${SCAN_DIR:-$PWD}"
+        local _tname
+        _tname="$(jq -r '.template_name // empty' "$PROJECT_DIR/.mkproj" 2>/dev/null || true)"
+        [[ -z "$_tname" ]] && _tname="$(_default_template_name)"
+        TEMPLATE_NAME="$_tname"
+        TEMPLATE_DIR="$TEMPLATES_DIR/$TEMPLATE_NAME"
+        return 0
+    fi
     if [[ "$MODE" == test ]]; then
         TEST_MODE=true
         unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS
@@ -1345,6 +1371,16 @@ run_pending_mode() {
     [[ "$found" == true ]] || log "No pending decisions found under $SCAN_DIR."
 }
 
+run_migrate_mode() {
+    local target="$PROJECT_DIR" apply_flag=""
+    [[ "$MIGRATE_APPLY" == true ]] && apply_flag="--apply"
+    [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
+    registry_exists "$target" || { err "No .mkproj found in $target"; return 1; }
+    # exit 1 means "diffs found" (not an error); exit 0 means all unchanged.
+    # Propagate as the script's own exit code without triggering the error trap.
+    migrate_project "$target" $apply_flag || exit $?
+}
+
 run_adopt_mode() {
     local target="$PROJECT_DIR"
     [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
@@ -1431,6 +1467,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         # check_project_repo refuses projects with real history, so adopt also
         # dispatches here. PROJECT_DIR was already set by initialize. (G-010)
         adopt)           run_adopt_mode ;;
+        migrate)         run_migrate_mode ;;
         *)               main ;;
     esac
 fi

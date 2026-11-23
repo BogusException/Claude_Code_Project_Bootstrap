@@ -97,15 +97,15 @@ current_template_hash() {
 }
 
 # project_to_template_path REL_PATH
+# Exact inverse of template_to_project_path in lib/registry.sh.
 project_to_template_path() {
     local rel="$1"
     case "$rel" in
-        .claude/hooks/*) printf '%s/hooks/%s\n' "$TEMPLATES_DIR" "${rel#.claude/hooks/}" ;;
-        .claude/rules/*) printf '%s/rules/%s\n' "$TEMPLATES_DIR" "${rel#.claude/rules/}" ;;
-        .git/hooks/*)    printf '%s/git-hooks/%s\n' "$TEMPLATES_DIR" "${rel#.git/hooks/}" ;;
-        docs/*)          printf '%s/%s\n' "$TEMPLATES_DIR" "$rel" ;;
-        tasks/*)         printf '%s/%s\n' "$TEMPLATES_DIR" "$rel" ;;
-        *)               printf '%s/%s\n' "$TEMPLATES_DIR" "$rel" ;;
+        .claude/hooks/*)   printf '%s/claude/hooks/%s\n'  "$TEMPLATE_DIR" "$(basename "$rel")" ;;
+        .claude/rules/*)   printf '%s/claude/rules/%s\n'  "$TEMPLATE_DIR" "$(basename "$rel")" ;;
+        .claude/skills/*)  printf '%s/claude/skills/%s\n' "$TEMPLATE_DIR" "$(basename "$rel")" ;;
+        .githooks/*)       printf '%s/git-hooks/%s\n'     "$TEMPLATE_DIR" "$(basename "$rel")" ;;
+        *)                 printf '%s/project/%s\n'       "$TEMPLATE_DIR" "$rel" ;;
     esac
 }
 
@@ -620,4 +620,135 @@ adopt_project() {
     done
 
     log "  adopted: $project_dir"
+}
+
+# _migrate_tier REL_PATH STORED_TIER
+# Returns the tier to use: stored tier if set, otherwise derives from path.
+_migrate_tier() {
+    local rel="$1" stored="$2"
+    [[ -n "$stored" && "$stored" != "null" ]] && { printf '%s\n' "$stored"; return; }
+    case "$rel" in
+        CLAUDE.md|AGENTS.md)              printf 'directive\n' ;;
+        .claude/hooks/*.sh|\
+        .claude/rules/*.md|\
+        .claude/settings.json|\
+        .githooks/*)                      printf 'infrastructure\n' ;;
+        *)                                printf 'optional\n' ;;
+    esac
+}
+
+# migrate_project PROJECT_DIR [--apply]
+# Dry-run by default. Classifies each .mkproj entry and optionally stamps
+# current template hashes and tier fields. Never touches project files.
+migrate_project() {
+    local project_dir="$1" apply=false
+    [[ "${2:-}" == "--apply" ]] && apply=true
+
+    local registry; registry="$(registry_path "$project_dir")"
+    if [[ ! -f "$registry" ]]; then
+        err "No .mkproj found in $project_dir"; return 1
+    fi
+
+    local ver; ver="$(jq -r '.mkproj_version // "0"' "$registry")"
+    # Version compare: if major >= 3, skip
+    if [[ "${ver%%.*}" -ge 3 ]] 2>/dev/null; then
+        log "  already v3 ($ver), nothing to do: $project_dir"
+        return 0
+    fi
+
+    if [[ "$apply" == true ]]; then
+        local backup_dir="$project_dir/backups"
+        mkdir -p "$backup_dir"
+        local backup="$backup_dir/mkproj-$(date -u +%Y%m%d-%H%M%S).mkproj"
+        cp "$registry" "$backup"
+        cmp -s "$registry" "$backup" || { err "Backup verify failed: $backup"; return 1; }
+    fi
+
+    printf '\n%-55s  %-18s  %-9s\n' "file" "classification" "tier"
+    printf '%s\n' "----------------------------------------------------------------------"
+
+    local unchanged=0 template_changed=0 user_edit=0 both_changed=0 gone=0 orphan=0
+    local all_unchanged=true
+
+    # Build new files object for --apply
+    local new_files='{}'
+
+    while IFS= read -r rel; do
+        local entry
+        entry="$(jq -c --arg p "$rel" '.files[$p]' "$registry")"
+        local stored_th stored_ih stored_tier stored_status
+        stored_th="$(jq -r '.template_hash // ""' <<< "$entry")"
+        stored_ih="$(jq -r '.installed_hash // ""' <<< "$entry")"
+        stored_tier="$(jq -r '.tier // ""' <<< "$entry")"
+        stored_status="$(jq -r '.status // "installed"' <<< "$entry")"
+
+        local tpl_path; tpl_path="$(project_to_template_path "$rel")"
+        local disk_path="$project_dir/$rel"
+
+        local cur_tpl_hash="" disk_hash="" classification tier
+        tier="$(_migrate_tier "$rel" "$stored_tier")"
+
+        if [[ ! -f "$tpl_path" ]]; then
+            classification="orphan"
+            ((orphan++)) || true
+        elif [[ ! -f "$disk_path" ]]; then
+            classification="gone_on_disk"
+            cur_tpl_hash="$(sha256sum "$tpl_path" | cut -d' ' -f1)"
+            ((gone++)) || true
+        else
+            cur_tpl_hash="$(sha256sum "$tpl_path" | cut -d' ' -f1)"
+            disk_hash="$(sha256sum "$disk_path" | cut -d' ' -f1)"
+            local tpl_same=false disk_same=false
+            [[ "$cur_tpl_hash" == "$stored_th" ]] && tpl_same=true
+            [[ "$disk_hash" == "$stored_ih" ]] && disk_same=true
+            if $tpl_same && $disk_same; then
+                classification="unchanged"
+                ((unchanged++)) || true
+            elif $tpl_same && ! $disk_same; then
+                classification="user_edit"
+                ((user_edit++)) || true
+                all_unchanged=false
+            elif ! $tpl_same && $disk_same; then
+                classification="template_changed"
+                ((template_changed++)) || true
+                all_unchanged=false
+            else
+                classification="both_changed"
+                ((both_changed++)) || true
+                all_unchanged=false
+            fi
+        fi
+        [[ "$classification" != "unchanged" ]] && all_unchanged=false
+
+        printf '%-55s  %-18s  %s\n' "$rel" "$classification" "$tier"
+
+        if [[ "$apply" == true ]]; then
+            # For unchanged: refresh template_hash (same value, ensures accuracy).
+            # For others: keep stored hashes; only update tier if missing.
+            local use_th="$stored_th" use_ih="$stored_ih"
+            [[ "$classification" == "unchanged" && -n "$cur_tpl_hash" ]] && use_th="$cur_tpl_hash"
+            new_files="$(jq --arg p "$rel" --arg th "$use_th" --arg ih "$use_ih" \
+                --arg st "$stored_status" --arg ti "$tier" \
+                '.[$p] = {template_hash:$th, installed_hash:$ih, status:$st, tier:$ti}' \
+                <<< "$new_files")"
+        fi
+    done < <(jq -r '.files | keys[]' "$registry")
+
+    printf '\n'
+    printf 'unchanged=%d  template_changed=%d  user_edit=%d  both_changed=%d  gone=%d  orphan=%d\n' \
+        "$unchanged" "$template_changed" "$user_edit" "$both_changed" "$gone" "$orphan"
+
+    if [[ "$apply" == true ]]; then
+        local now; now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        local tmp; tmp="$(mktemp "$(dirname "$registry")/.mkproj.XXXXXXXX")"
+        jq --argjson f "$new_files" --arg v "$MKPROJ_VERSION" --arg t "$now" \
+            '.files = $f | .mkproj_version = $v | .updated_at = $t' \
+            "$registry" > "$tmp"
+        mv -T -- "$tmp" "$registry"
+        log "  applied: $project_dir  (v$ver -> v$MKPROJ_VERSION)"
+    else
+        log "  dry-run: pass --apply to write changes"
+    fi
+
+    $all_unchanged && return 0 || return 1
 }

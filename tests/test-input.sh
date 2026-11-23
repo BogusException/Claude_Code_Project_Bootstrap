@@ -28,6 +28,9 @@ printf -v huge '%010000d' 0
 reject validate_name "a$huge"
 accept validate_cli_args
 for arg in --help -h --usage --test my_tool; do accept validate_cli_args "$arg"; done
+accept validate_cli_args migrate
+accept validate_cli_args migrate /tmp/somedir
+accept validate_cli_args migrate /tmp/somedir --apply
 reject validate_cli_args ""
 reject validate_cli_args --unknown
 reject validate_cli_args one two
@@ -129,4 +132,34 @@ mkdir "$scratch/BadName"
 if (cd "$scratch/BadName" && PATH="$scratch/bin:$PATH" bash "$ROOT/bootstrap.sh") >/dev/null 2>&1; then exit 1; fi
 [[ ! -e "$scratch/calls" ]] || exit 1
 count=$((count + 1))
+# migrate mode: dry-run does not modify .mkproj; --apply stamps tiers and bumps version
+migrate_tmp="$(mktemp -d)"
+mkdir -p "$migrate_tmp/backups"
+cat > "$migrate_tmp/.mkproj" <<'EOF'
+{"format":1,"mkproj_version":"2.1.0","installed_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","components":["adopted"],"files":{"CLAUDE.md":{"template_hash":"aaa","installed_hash":"bbb","status":"installed"},"requirements.txt":{"template_hash":"ccc","installed_hash":"ccc","status":"installed"}}}
+EOF
+orig_mtime="$(stat -c %Y "$migrate_tmp/.mkproj")"
+# dry-run: .mkproj must not change
+bash "$ROOT/bootstrap.sh" migrate "$migrate_tmp" > /dev/null 2>&1 || true
+new_mtime="$(stat -c %Y "$migrate_tmp/.mkproj")"
+[[ "$orig_mtime" == "$new_mtime" ]] || { err "FAIL: migrate dry-run modified .mkproj"; exit 1; }
+count=$((count + 1))
+# --apply: mkproj_version bumped, tier fields added
+bash "$ROOT/bootstrap.sh" migrate "$migrate_tmp" --apply > /dev/null 2>&1 || true
+migrated_ver="$(jq -r '.mkproj_version' "$migrate_tmp/.mkproj")"
+[[ "${migrated_ver%%.*}" -ge 3 ]] 2>/dev/null || { err "FAIL: migrate --apply did not bump mkproj_version (got $migrated_ver)"; exit 1; }
+count=$((count + 1))
+tier_claude="$(jq -r '.files["CLAUDE.md"].tier' "$migrate_tmp/.mkproj")"
+[[ "$tier_claude" == "directive" ]] || { err "FAIL: migrate --apply did not set directive tier on CLAUDE.md (got $tier_claude)"; exit 1; }
+count=$((count + 1))
+tier_req="$(jq -r '.files["requirements.txt"].tier' "$migrate_tmp/.mkproj")"
+[[ "$tier_req" == "optional" ]] || { err "FAIL: migrate --apply did not set optional tier on requirements.txt (got $tier_req)"; exit 1; }
+count=$((count + 1))
+# Already v3: migrate --apply should be a no-op
+bash "$ROOT/bootstrap.sh" migrate "$migrate_tmp" --apply > /dev/null 2>&1 || true
+ver_after="$(jq -r '.mkproj_version' "$migrate_tmp/.mkproj")"
+[[ "$ver_after" == "$migrated_ver" ]] || { err "FAIL: migrate re-ran on already-v3 manifest"; exit 1; }
+count=$((count + 1))
+rm -rf "$migrate_tmp"
+
 printf 'PASS: %s input, boundary, EOF, and no-side-effect checks\n' "$count"
