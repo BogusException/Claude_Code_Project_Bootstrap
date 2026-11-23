@@ -1276,6 +1276,26 @@ run_scan_mode() {
         esac
     done < <(scan_projects "$SCAN_DIR")
 
+    # Nested project detection: flag any project path that lives inside another
+    local nested_tmp; nested_tmp="$(mktemp)"
+    printf '%s\n' "${managed[@]}" "${unmanaged[@]}" > "$nested_tmp"
+    local nested_found=false
+    local nested_report="$BOOTSTRAP_DIR/responses/internal/nested-project-candidates.md"
+    while IFS=: read -r _ parent child; do
+        if [[ "$nested_found" == false ]]; then
+            nested_found=true
+            warn "NESTED PROJECTS DETECTED -- manual extraction recommended"
+            printf '# Nested project candidates\nDetected by mkproj scan on %s\nManual extraction needed: move each nested project to its own top-level directory.\n\n' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$nested_report"
+        fi
+        warn "  PARENT: $parent"
+        warn "  NESTED: $child"
+        printf '## Nested pair\nPARENT: %s\nNESTED: %s\nACTION NEEDED: move nested project to ~/Projects/%s\n\n' \
+            "$parent" "$child" "$(basename "$child")" >> "$nested_report"
+    done < <(detect_nested_projects "$nested_tmp")
+    rm -f "$nested_tmp"
+    [[ "$nested_found" == true ]] && warn "Full list: $nested_report"
+
     for d in "${managed[@]}"; do
         log "=== $d ==="
         update_project "$d" || had_issues=true

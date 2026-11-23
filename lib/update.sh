@@ -762,3 +762,22 @@ migrate_project() {
 
     $all_unchanged && return 0 || return 1
 }
+
+# detect_nested_projects PATHS_FILE
+# Reads newline-separated project paths from PATHS_FILE.
+# Prints "NESTED:parent:child" for any path that is a subdirectory of another.
+detect_nested_projects() {
+    local paths_file="$1"
+    local -a paths
+    mapfile -t paths < "$paths_file"
+    local i j
+    for (( i=0; i<${#paths[@]}; i++ )); do
+        for (( j=0; j<${#paths[@]}; j++ )); do
+            [[ $i -eq $j ]] && continue
+            # Check if paths[j] starts with paths[i]/ (true subdirectory)
+            if [[ "${paths[$j]}" == "${paths[$i]}/"* ]]; then
+                printf 'NESTED:%s:%s\n' "${paths[$i]}" "${paths[$j]}"
+            fi
+        done
+    done
+}
