@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.0] - 2026-11-22 -- CRC32(bootstrap.sh) `e39fdc13`
+
+### Added
+- `mkproj migrate [DIR] [--apply]`: upgrades a v2.x `.mkproj` registry to v3 format without touching any project file. Dry-run by default -- prints a per-file classification table (unchanged / template_changed / user_edit / both_changed / gone_on_disk / orphan) and tier assignments. Pass `--apply` to stamp tier fields, refresh unchanged template hashes, bump `mkproj_version`, and write an audit log to `responses/internal/migration-changelog-<project>.txt`.
+
+### Fixed
+- **Defect 1 (G-009 root cause)**: `TEMPLATE_DIR` was never set for maintenance modes (`check`, `scan`, `status`, `pending`, `safe-update`, `report`, `restore-infra`, `list-tiers`). `template_to_project_path` stripped nothing, causing all tracked files except `.claude/settings.json` to silently drop. Fixed by resolving `TEMPLATE_DIR` from `.mkproj` or the default template in `initialize()` before the early-return for maintenance modes. `mkproj tiers ~/Projects/pfsense_wazuh` now visits 36 files (was 1).
+- **Defect 2**: `project_to_template_path` in `lib/update.sh` referenced flat v2 layout paths (`templates/hooks/`, `templates/rules/`) which do not exist in v3. Rewrote as exact inverse of `template_to_project_path` using `$TEMPLATE_DIR/claude/hooks/`, `claude/rules/`, `claude/skills/`, `git-hooks/`, `project/`.
+- **Defect 3**: git hooks key mismatch -- `project_to_template_path` mapped `.git/hooks/*` but v3 canonical path is `.githooks/*`. Corrected.
+
 ## [3.1.3] - 2026-11-22 -- CRC32(bootstrap.sh) `e6daf010`
 
 ### Fixed
