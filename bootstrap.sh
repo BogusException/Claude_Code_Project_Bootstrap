@@ -8,7 +8,7 @@ TEMPLATES_DIR="$BOOTSTRAP_DIR/templates"
 TEMPLATE_NAME=""    # set in initialize(); empty = prompt user
 TEMPLATE_DIR=""     # set in initialize() after TEMPLATE_NAME is resolved
 MODULE_NAME=""      # derived from PROJECT_NAME (hyphens -> underscores)
-MKPROJ_VERSION="3.2.0"
+MKPROJ_VERSION="3.2.1"
 INSTALL_KEYBINDINGS=false
 TEST_MODE=false
 SETUP_LOCAL_REPO=false
@@ -1392,13 +1392,14 @@ run_pending_mode() {
 }
 
 run_migrate_mode() {
-    local target="$PROJECT_DIR" apply_flag=""
-    [[ "$MIGRATE_APPLY" == true ]] && apply_flag="--apply"
+    local target="$PROJECT_DIR" migrate_flags=()
+    [[ "$MIGRATE_APPLY" == true ]]     && migrate_flags+=(--apply)
+    [[ "$MIGRATE_PORCELAIN" == true ]] && migrate_flags+=(--porcelain)
     [[ -d "$target" ]] || { err "Not a directory: $target"; return 1; }
     registry_exists "$target" || { err "No .mkproj found in $target"; return 1; }
     # exit 1 means "diffs found" (not an error); exit 0 means all unchanged.
     # Propagate as the script's own exit code without triggering the error trap.
-    migrate_project "$target" $apply_flag || exit $?
+    migrate_project "$target" "${migrate_flags[@]}" || exit $?
 }
 
 run_adopt_mode() {
@@ -1477,7 +1478,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         # (G-003 Bug B: preflight read $PROJECT_NAME which is unset for these.)
         scan)            run_scan_mode ;;
         check)           run_check_mode ;;
-        status)          run_status_mode ;;
+        status)          run_status_mode || exit $? ;;
         pending)         run_pending_mode ;;
         safe-update)     run_safe_update_mode ;;
         report)          run_report_mode ;;

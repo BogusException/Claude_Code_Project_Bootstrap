@@ -40,6 +40,7 @@ parse_args() {
     VERBOSE=false
     SAFE_MODE=false
     MIGRATE_APPLY=false
+    MIGRATE_PORCELAIN=false
     FORCE_FILE=""
     ACCEPT_FILE=""
     TEMPLATE_NAME=""
@@ -123,6 +124,7 @@ parse_args() {
             --verbose|-v)    VERBOSE=true ;;
             --safe)          SAFE_MODE=true ;;
             --apply)         MIGRATE_APPLY=true ;;
+            --porcelain)     MIGRATE_PORCELAIN=true ;;
             --force-file)    next_is_force=true ;;
             --file)          next_is_file=true ;;
             --template)      next_is_template=true ;;
@@ -148,6 +150,9 @@ parse_args() {
     fi
     if [[ -n "$FORCE_FILE" && "$MODE" != update ]]; then
         err "--force-file is only valid with --update."; return 1
+    fi
+    if [[ "$MIGRATE_PORCELAIN" == true && "$MODE" != migrate ]]; then
+        err "--porcelain is only valid with migrate."; return 1
     fi
     if [[ -n "$FORCE_FILE" && "$YES_MODE" == true ]]; then
         err "--force-file cannot be combined with --yes."; return 1

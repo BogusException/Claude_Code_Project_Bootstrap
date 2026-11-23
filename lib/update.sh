@@ -578,17 +578,17 @@ scan_projects() {
         \( -name ".git" -o -name ".venv" -o -name "node_modules" \
            -o -name "__pycache__" -o -name "backups" -o -name "responses" \) \
         -prune -o \
-        -name ".mkproj" -print0 2>/dev/null)
+        -name ".mkproj" -print0 2>/dev/null || true)
 
     while IFS= read -r -d '' item; do
         local dir; dir="$(dirname "$item")"
-        [[ -f "$dir/.mkproj" ]] && continue
+        if [[ -f "$dir/.mkproj" ]]; then continue; fi
         printf 'unmanaged:%s\n' "$dir"
     done < <(find -L "$root" \
         \( -name ".git" -o -name ".venv" -o -name "node_modules" \
            -o -name "__pycache__" -o -name "backups" -o -name "responses" \) \
         -prune -o \
-        -name "CLAUDE.md" -print0 2>/dev/null)
+        -name "CLAUDE.md" -print0 2>/dev/null || true)
 }
 
 # adopt_project PROJECT_DIR
@@ -641,8 +641,11 @@ _migrate_tier() {
 # Dry-run by default. Classifies each .mkproj entry and optionally stamps
 # current template hashes and tier fields. Never touches project files.
 migrate_project() {
-    local project_dir="$1" apply=false
-    [[ "${2:-}" == "--apply" ]] && apply=true
+    local project_dir="$1" apply=false porcelain=false
+    for _arg in "${@:2}"; do
+        [[ "$_arg" == "--apply" ]]     && apply=true
+        [[ "$_arg" == "--porcelain" ]] && porcelain=true
+    done
 
     local registry; registry="$(registry_path "$project_dir")"
     if [[ ! -f "$registry" ]]; then
@@ -760,6 +763,7 @@ migrate_project() {
         log "  dry-run: pass --apply to write changes"
     fi
 
+    if $porcelain; then return 0; fi
     $all_unchanged && return 0 || return 1
 }
 

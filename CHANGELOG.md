@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.1] - 2026-11-22 -- CRC32(bootstrap.sh) `18765721`
+
+### Added
+- `mkproj migrate --porcelain`: always exits 0, even when the dry-run finds pending changes. Intended for CI pipelines where a non-zero exit should mean "command failed", not "diffs found".
+- Nested project detection in `mkproj scan`: warns when any managed or unmanaged project path lives inside another, writes a candidate list to `responses/internal/nested-project-candidates.md`.
+
+### Fixed
+- `mkproj status ~/Projects` (and any scan over a directory with dangling symlinks or permission-restricted paths) emitted two spurious "mkproj failed in phase initialize" errors before the project list. Root cause: `find -L` can exit non-zero on permission errors or dangling symlinks even with `2>/dev/null`, and `set -E` propagated the ERR trap into the `scan_projects` process substitution subshells. Fixed by adding `|| true` to both `find` invocations in `scan_projects` and converting `[[ ]] && continue` to an `if`-block so the false-branch exit code is never 1.
+- `mkproj status` triggered the ERR trap with exit 2 (the "projects have pending changes" signal) when the case-dispatch called `run_status_mode`. Fixed by using `run_status_mode || exit $?` so the informational exit code propagates without the trap firing.
+
 ## [3.2.0] - 2026-11-22 -- CRC32(bootstrap.sh) `e39fdc13`
 
 ### Added
