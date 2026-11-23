@@ -746,6 +746,16 @@ migrate_project() {
             "$registry" > "$tmp"
         mv -T -- "$tmp" "$registry"
         log "  applied: $project_dir  (v$ver -> v$MKPROJ_VERSION)"
+
+        # Write per-project migration audit log so other sessions can track what changed.
+        local log_dir="$BOOTSTRAP_DIR/responses/internal"
+        local proj_name; proj_name="$(basename "$project_dir")"
+        local log_file="$log_dir/migration-changelog-${proj_name}.txt"
+        mkdir -p "$log_dir"
+        printf '[%s] ACTION: MODIFIED %s/.mkproj\nREASON: mkproj migrate --apply bumped version %s -> %s, stamped tier fields\nCLASSIFICATION_SUMMARY: unchanged=%d template_changed=%d user_edit=%d both_changed=%d gone=%d orphan=%d\n\n' \
+            "$now" "$project_dir" "$ver" "$MKPROJ_VERSION" \
+            "$unchanged" "$template_changed" "$user_edit" "$both_changed" "$gone" "$orphan" \
+            >> "$log_file"
     else
         log "  dry-run: pass --apply to write changes"
     fi
