@@ -574,7 +574,7 @@ scan_projects() {
     local root="$1"
     while IFS= read -r -d '' item; do
         printf 'managed:%s\n' "$(dirname "$item")"
-    done < <(find "$root" \
+    done < <(find -L "$root" \
         \( -name ".git" -o -name ".venv" -o -name "node_modules" \
            -o -name "__pycache__" -o -name "backups" -o -name "responses" \) \
         -prune -o \
@@ -584,7 +584,7 @@ scan_projects() {
         local dir; dir="$(dirname "$item")"
         [[ -f "$dir/.mkproj" ]] && continue
         printf 'unmanaged:%s\n' "$dir"
-    done < <(find "$root" \
+    done < <(find -L "$root" \
         \( -name ".git" -o -name ".venv" -o -name "node_modules" \
            -o -name "__pycache__" -o -name "backups" -o -name "responses" \) \
         -prune -o \

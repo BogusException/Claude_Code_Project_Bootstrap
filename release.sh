@@ -77,11 +77,21 @@ fi
 git push --follow-tags
 
 # Create GitHub release
-NOTES="$(awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | grep -v "^## \[" | sed '/^$/d')"
+# Range patterns test the end regex on the start line too, so a range opened on
+# a "## [" header closes at once. Track state instead.
+NOTES="$(awk -v tag="## [$VERSION]" '
+    index($0, tag) == 1 { on = 1; next }
+    /^## \[/ { exit }
+    on && NF { print }
+' CHANGELOG.md)"
 gh release create "$TAG" \
     --repo "$REPO_SLUG" \
     --title "$TAG" \
-    --notes "$NOTES"
+    --notes "$NOTES" || {
+    rc=$?
+    echo "ERROR: gh release create failed with exit $rc" >&2
+    exit "$rc"
+}
 
 echo ""
 echo "Released $TAG successfully."

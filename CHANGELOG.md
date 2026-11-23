@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.1.3] - 2026-11-22 -- CRC32(bootstrap.sh) `e6daf010`
+
+### Fixed
+- `mkproj scan` did not follow symbolic links, so a staging directory of symlinked candidates showed up empty. Added `-L` to both `find` invocations in `scan_projects` (`lib/update.sh:577,587`).
+- `release.sh` created the git tag and pushed the commit but silently skipped `gh release create`, because the awk range pattern `/^## \[$VERSION\]/,/^## \[/` tested the end regex against the start line and closed immediately, leaving `NOTES` empty and the gh call with no release body. Rewrote the extraction with explicit state tracking, and added a hard-fail if `gh release create` returns non-zero so the next silent failure surfaces.
+
 ## [3.1.2] - 2026-11-22 -- CRC32(bootstrap.sh) `b3270103`
 
 ### Fixed
