@@ -102,7 +102,7 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 
 **Workaround for Phase 1 clean-adopt batch**: run scan on a directory that excludes the 9 pre-v3 projects. The 17 clean-adopt candidates are in `responses/internal/phase1-inventory.md` section 2.
 
-**Status**: open. Needs its own screw. Captured in tasks/todo.md.
+**Status**: open. Needs its own screw. Captured in tasks/todo.md. Symlink-follow issue in `scan_projects` fixed in v3.1.3 (separate from the v2.x crash — that remains open).
 
 ---
 
@@ -139,3 +139,19 @@ Keep this file alive. Add to it when something burns a session; prune when a fix
 **Mitigation**: before any batch scan, audit top-level files in `~/Projects/` for credentials. Not a code change; operational procedure.
 
 **Status**: operational.
+
+---
+
+## G-012: Claude Code does not export `CLAUDE_MODEL` to hook subprocesses
+
+**Symptom**: A `UserPromptSubmit` hook that tries to read the active model (to warn when task complexity doesn't match the selected tier) always sees the model from session start. If the user runs `/model sonnet` mid-session, the hook still reports the original model.
+
+**Cause**: Claude Code does not inject a `CLAUDE_MODEL` environment variable when it invokes hook subprocesses. Hooks launch in a subprocess with no session state from the harness. The hook has no way to discover that the model changed.
+
+**Impact**: Any hook-based model-matching or cost-warning logic is unreliable after a mid-session model switch. For project-bootstrap specifically this means the `auto-brain-warn` hook (which advises on model selection) cannot be built reliably as a `UserPromptSubmit` hook.
+
+**Workaround**: Use a Claude Code **mod** instead of a hook. Mods run in-process and have direct access to `$.session.model()`, which always reflects the current model. The `auto-brain-warn` mod in `~/.claude/smartmodel/mods/` demonstrates this pattern.
+
+**Bug filed**: anthropics/claude-code#111757.
+
+**Status**: open upstream. Workaround via mod is functional.

@@ -45,19 +45,19 @@ A lot more is possible. Some of what's available:
 
 **Update a project**
 
-    mkproj --update                        # update current project from latest template
-    mkproj --safe-update                   # update only optional files, skip directives/infra
-    mkproj --force-file PATH               # force-update a single file, bypassing conflict skip
+    mkproj update                          # update current project from latest template
+    mkproj update --safe                   # update only optional files, skip directives/infra
+    mkproj update --force-file PATH        # force-update a single file, bypassing conflict skip
 
 **Manage multiple projects**
 
-    mkproj --scan ~/Projects               # update all mkproj projects under a directory
-    mkproj --status ~/Projects             # dry-run scan: show what would change, touch nothing
-    mkproj --pending ~/Projects            # interactively resolve all deferred conflicts
+    mkproj scan ~/Projects                 # update all mkproj projects under a directory
+    mkproj status ~/Projects               # dry-run scan: show what would change, touch nothing
+    mkproj pending ~/Projects              # interactively resolve all deferred conflicts
 
 **Enroll an existing project**
 
-    mkproj --adopt                         # enroll an existing Claude Code project in mkproj
+    mkproj adopt                           # enroll an existing Claude Code project in mkproj
 
 **File tier audit**
 
