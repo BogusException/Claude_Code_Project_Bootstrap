@@ -51,6 +51,13 @@ See `docs/gotchas.md` for persistent hazards and `CHANGELOG.md` for shipped hist
 - [ ] **Resolve the 9 pre-v3 managed projects**
   - auto-brain, cc-accelo, claude-skill-goal, claude_skills, cx-goldmine, cx-todolist, model_router, ollama, pfsense_wazuh.
   - Needs v2→v3 manifest migration (gotcha G-006) and TODO-C overwrite policy.
+  - **Pilot order (5-project, v3.1.3):** pfsense_wazuh, ollama, cc-accelo, claude-skill-goal, cx-goldmine.
+    auto-brain is excluded from the pilot (active work in another session; do not touch).
+  - Before moving, deleting, or renaming any file in a pilot project, write a log entry to
+    `responses/internal/migration-changelog-<PROJECT_NAME>.txt` (FORMAT, one entry per action):
+    `[TIMESTAMP UTC] ACTION: <MOVED|DELETED|CREATED|MODIFIED> <FROM_PATH> -> <TO_PATH>`
+    `REASON: <one line>`
+    Write the entry BEFORE executing the action. Append a FAILED line if the action fails.
 
 - [ ] **Phase 1 REVIEW group: 15 projects**
   - Hand-review each per `phase1-inventory.md` section 3.
